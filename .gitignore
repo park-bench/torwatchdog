@@ -1,0 +1,7 @@
+debian/tmp
+debian/debhelper.log
+debian/files
+src/etc/opt/torwatchdog/torwatchdog.conf
+src/var/opt/log/torwatchdog.log
+src/opt/gpgmailqueue.pyc
+src/opt/timber.pyc

@@ -1,0 +1,11 @@
+Source: torwatchdog
+Section: parkbench
+Priority: required
+Maintainer: eviljoel, Andrew Klapp
+#Build-Depends:
+Standards-Version: 3.9.6.1
+
+Package: torwatchdog
+Architecture: any
+Depends: timber,gpgmailer,confighelper
+Description: Daemon that checks URL resolution through Tor.
