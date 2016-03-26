@@ -6,6 +6,6 @@ Maintainer: eviljoel, Andrew Klapp
 Standards-Version: 3.9.6.1
 
 Package: torwatchdog
-Architecture: any
+Architecture: all
 Depends: timber,gpgmailer,confighelper
 Description: Daemon that checks URL resolution through Tor.
