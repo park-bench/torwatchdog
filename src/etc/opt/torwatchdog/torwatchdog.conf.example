@@ -1,25 +1,25 @@
 # torwatchdog.conf.example
-# example configuration for torwatchdog
+# Example configuration for torwatchdog.
 
 [General]
 
-# log file
-log_file=/var/opt/log/watchdog.log
+# Log file
+log_file=/var/opt/log/torwatchdog.log
 
-# log level
+# Log level
 log_level=info
 
 # Tor cache directory
 cache_dir=/tmp/torwatchdog/cache
 
-# url is the url that the watchdog checks
+# The URL that torwatchdog checks
 url=
 
-# SOCKS port, Tor will listen on this port
+# Tor will listen on this port
 socks_port=7000
 
-# average delay between checks, in seconds
+# Average delay between checks, in seconds
 avg_delay=300
 
-# subject line, an arbitary string. subject lines are not encrypted
+# Subject line, an arbitary string. Subject lines are not encrypted
 subject=
