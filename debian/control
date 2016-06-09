@@ -7,5 +7,5 @@ Standards-Version: 3.9.6.1
 
 Package: torwatchdog
 Architecture: all
-Depends: timber,gpgmailer,confighelper,python-stem,python-socksipy
+Depends: confighelper,gpgmailer,python-stem,python-socksipy,timber,tor
 Description: Daemon that checks URL resolution through Tor.
