@@ -3,7 +3,7 @@
 Torwatchdog is a daemon that checks availability of an arbitrary URL through
 Tor and sends encrypted notification emails using our gpgmailer daemon.
 
-**NOTICE:** Some distrobutions do not maintain secure and updated version of
+**NOTICE:** Some distributions do not maintain secure and updated version of
 Tor. Please manually add the Tor Project's Apt repository. Instructions are
 here: https://www.torproject.org/docs/debian.html.en
 
