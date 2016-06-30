@@ -161,7 +161,7 @@ try:
             message = gpgmailmessage.GpgMailMessage()
             message.set_subject(config['subject'])
             message.set_body('Down notification for %s at %s.' % (config['url'], datetime.datetime.now()))
-            message.save()
+            message.queue_for_sending()
       
         # Send e-mail if the site just came back up
         if (current_status and not prior_status):
@@ -170,7 +170,7 @@ try:
             message = gpgmailmessage.GpgMailMessage()
             message.set_subject(config['subject'])
             message.set_body('Up notification for %s at %s.' % (config['url'], datetime.datetime.now()))
-            message.save()
+            message.queue_for_sending()
         prior_status = current_status
 
 except Exception,e:
