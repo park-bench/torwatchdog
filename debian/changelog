@@ -1,3 +1,11 @@
+torwatchdog (0.2) UNRELEASED; urgency=low
+
+  * Updated for new gpgmailer interface.
+  * Updated for new confighelper release.
+  * Removed Timber dependency.
+
+ -- Andrew Klapp <andklapp@null.net>  Wed, 13 Jul 2016 21:50:17 -0500
+
 torwatchdog (0.1) stable; urgency=low
 
   * Initial release.

@@ -18,6 +18,7 @@
 import confighelper
 import ConfigParser
 import datetime
+import logging
 import os
 import random
 import signal
@@ -27,7 +28,6 @@ import stem.process
 import sys
 import time
 import urllib
-import timber
 import gpgmailqueue
 import traceback
 
@@ -73,7 +73,6 @@ def daemonize():
     pidFile.write("%s\n" % pid)
     pidFile.close()
     
-daemonize()
 
 config_file = ConfigParser.SafeConfigParser()
 config_file.read('/etc/opt/torwatchdog/torwatchdog.conf')
@@ -83,7 +82,9 @@ config_helper = confighelper.ConfigHelper()
 log_file = config_helper.verify_string_exists_prelogging(config_file, 'log_file')
 log_level = config_helper.verify_string_exists_prelogging(config_file, 'log_level')
 
-logger = timber.get_instance_with_filename(log_file, log_level)
+confighelper.configure_logger(log_file, log_level)
+
+logger = logging.getLogger()
 
 logger.info('Verifying non-logging config')
 config = {}
@@ -152,6 +153,7 @@ def sig_term_handler(signal, stack_frame):
 
 signal.signal(signal.SIGTERM, sig_term_handler)
 
+daemonize()
 try:
  
     # Init the secure random number generator
