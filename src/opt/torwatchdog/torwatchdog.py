@@ -28,7 +28,7 @@ import sys
 import time
 import urllib
 import timber
-import gpgmailqueue
+import gpgmailmessage
 import traceback
 
 pid_file = '/var/opt/run/torwatchdog.pid'
@@ -172,18 +172,20 @@ try:
         # Send e-mail if the site just went down
         if (not current_status and prior_status):
             logger.warn("Send down notification")
-            message_dict = {}
-            message_dict["subject"] = config['subject']
-            message_dict["message"] = 'Down notification for %s at %s.' % (config['url'], datetime.datetime.now())
-            gpgmailqueue.send(message_dict)
+
+            message = gpgmailmessage.GpgMailMessage()
+            message.set_subject(config['subject'])
+            message.set_body('Down notification for %s at %s.' % (config['url'], datetime.datetime.now()))
+            message.queue_for_sending()
       
         # Send e-mail if the site just came back up
         if (current_status and not prior_status):
             logger.info("Send up notification")
-            message_dict = {}
-            message_dict["subject"] = config['subject']
-            message_dict["message"] = 'Up notification for %s at %s.' % (config['url'], datetime.datetime.now())
-            gpgmailqueue.send(message_dict)
+
+            message = gpgmailmessage.GpgMailMessage()
+            message.set_subject(config['subject'])
+            message.set_body('Up notification for %s at %s.' % (config['url'], datetime.datetime.now()))
+            message.queue_for_sending()
         prior_status = current_status
 
 except Exception,e:
