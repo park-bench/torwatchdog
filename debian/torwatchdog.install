@@ -1,4 +1,3 @@
-src/etc/* etc
-src/opt/* opt
-src/var/* var
+src/usr/* usr
+src/run/* run
 LICENSE usr/share/doc/torwatchdog
