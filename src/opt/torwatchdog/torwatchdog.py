@@ -82,7 +82,7 @@ config_helper = confighelper.ConfigHelper()
 log_file = config_helper.verify_string_exists_prelogging(config_file, 'log_file')
 log_level = config_helper.verify_string_exists_prelogging(config_file, 'log_level')
 
-confighelper.configure_logger(log_file, log_level)
+config_helper.configure_logger(log_file, log_level)
 
 logger = logging.getLogger()
 
