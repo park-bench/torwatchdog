@@ -76,7 +76,7 @@ def daemonize():
 daemonize()
 
 config_file = ConfigParser.SafeConfigParser()
-config_file.read('/usr/local/etc/torwatchdog/torwatchdog.conf')
+config_file.read('/etc/torwatchdog/torwatchdog.conf')
 
 # Logging config goes first
 config_helper = confighelper.ConfigHelper()

@@ -4,7 +4,7 @@
 [General]
 
 # Log file
-log_file=/usr/local/torwatchdog/log/torwatchdog.log
+log_file=/var/log/torwatchdog.log
 
 # Log level
 log_level=info
