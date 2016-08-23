@@ -1,5 +1,9 @@
 torwatchdog (0.1) stable; urgency=low
 
+  [ andklapp ]
   * Initial release.
+
+  [ Britt Dogg ]
+  * Changed install location.
 
  -- andklapp <andklapp@null.net>  Wed, 22 Jun 2016 20:38:00 -0500
