@@ -31,7 +31,7 @@ import timber
 import gpgmailmessage
 import traceback
 
-pid_file = '/var/opt/run/torwatchdog.pid'
+pid_file = '/run/torwatchdog.pid'
 
 # TODO: Check for network/internet connection if it's down
 
@@ -76,7 +76,7 @@ def daemonize():
 daemonize()
 
 config_file = ConfigParser.SafeConfigParser()
-config_file.read('/etc/opt/torwatchdog/torwatchdog.conf')
+config_file.read('/etc/torwatchdog/torwatchdog.conf')
 
 # Logging config goes first
 config_helper = confighelper.ConfigHelper()

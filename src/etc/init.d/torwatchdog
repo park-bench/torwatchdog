@@ -17,15 +17,15 @@
 PATH=/sbin:/usr/sbin:/bin:/usr/bin
 DESC="Tor Hidden Service Watchdog"
 NAME=torwatchdog
-DAEMON=/opt/torwatchdog/$NAME.py
-PIDFILE=/var/opt/run/$NAME.pid
+DAEMON=/usr/share/torwatchdog/$NAME.py
+PIDFILE=/run/$NAME.pid
 SCRIPTNAME=/etc/init.d/$NAME
 
 # Exit if the package is not installed
 [ -x "$DAEMON" ] || exit 0
 
 # Read configuration variable file if it is present
-[ -r /etc/opt/default/$NAME ] && . /etc/opt/default/$NAME
+[ -r /etc/default/$NAME ] && . /etc/default/$NAME
 
 # Load the VERBOSE setting and other rcS variables
 . /lib/init/vars.sh
