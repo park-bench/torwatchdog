@@ -1,1 +1,0 @@
-/opt/gpgmailer/gpgmailmessage.py
