@@ -18,6 +18,7 @@
 import confighelper
 import ConfigParser
 import datetime
+import gpgmailmessage
 import logging
 import os
 import random
@@ -27,9 +28,8 @@ import socks  # SocksiPy module
 import stem.process
 import sys
 import time
-import urllib
-import gpgmailqueue
 import traceback
+import urllib
 
 pid_file = '/run/torwatchdog.pid'
 
