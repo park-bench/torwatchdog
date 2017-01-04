@@ -17,6 +17,7 @@
 
 import confighelper
 import ConfigParser
+import daemon
 import datetime
 import gpgmailmessage
 import logging
@@ -33,46 +34,9 @@ import urllib
 
 pid_file = '/run/torwatchdog.pid'
 
-# TODO: Check for network/internet connection if it's down
+# TODO: Consider running in a chroot or jail.
 
-def daemonize():
-    # Fork the first time to make init our parent.
-    try:
-        pid = os.fork()
-        if pid > 0:
-            sys.exit(0)
-    except OSError, e:
-        sys.stderr.write("Failed to make parent process init: %d (%s)" % (e.errno, e.strerror))
-        sys.exit(1)
-
-    os.chdir("/")  # Change the working directory
-    os.setsid()  # Create a new process session.
-    os.umask(0)
-
-    # Fork the second time to make sure the process is not a session leader. 
-    #   This apparently prevents us from taking control of a TTY.
-    try:
-        pid = os.fork()
-        if pid > 0:
-            sys.exit(0)
-    except OSError, e:
-        sys.stderr.write("Failed to give up session leadership: %d (%s)" % (e.errno, e.strerror))
-        sys.exit(1)
-
-    # Redirect standard file descriptors
-    sys.stdout.flush()
-    sys.stderr.flush()
-    devnull = os.open(os.devnull, os.O_RDWR)
-    os.dup2(devnull, sys.stdin.fileno())
-    os.dup2(devnull, sys.stdout.fileno())
-    os.dup2(devnull, sys.stderr.fileno())
-    os.close(devnull)
-
-    pid = str(os.getpid())
-    pidFile = file(pid_file,'w')
-    pidFile.write("%s\n" % pid)
-    pidFile.close()
-    
+# TODO: Check if network/internet connection is down
 
 config_file = ConfigParser.SafeConfigParser()
 config_file.read('/etc/torwatchdog/torwatchdog.conf')
@@ -151,47 +115,56 @@ def sig_term_handler(signal, stack_frame):
     tor_process.kill()
     sys.exit(0)
 
-signal.signal(signal.SIGTERM, sig_term_handler)
+# TODO: Work out a permissions setup for this program so that it doesn't run as root.
+daemon_context = daemon.DaemonContext(
+    working_directory = '/',
+    pidfile = pidlockfile.PIDLockFile(pid_file),
+    umask = 0o033
+    )
 
-daemonize()
-try:
- 
-    # Init the secure random number generator
-    randomGenerator = random.SystemRandom()  # Uses /dev/urandom
-    logger.trace('Starting loop.')
+daemon_context.signal_map = {
+    signal.SIGTERM : sig_term_handler
+    }
 
-    while(True):
-        logger.trace('Sleeping!')
+with daemon_context:
+    try:
+        # Init the secure random number generator
+        randomGenerator = random.SystemRandom()  # Uses /dev/urandom
+        logger.trace('Starting loop.')
 
-        # Let's not be too obvious here. Ramdomize the requests.
-        time.sleep(random.uniform(0, int(config['avg_delay'])))
+        while(True):
+            logger.trace('Sleeping!')
 
-        logger.trace('Start checking url')
-    
-        current_status = is_site_up(config['url'])
-        logger.trace('Done checking url.')
+            # Let's not be too obvious here. Ramdomize the requests.
+            time.sleep(random.uniform(0, int(config['avg_delay'])))
 
-        # Send e-mail if the site just went down
-        if (not current_status and prior_status):
-            logger.warn("Send down notification")
+            logger.trace('Start checking url')
+        
+            current_status = is_site_up(config['url'])
+            logger.trace('Done checking url.')
 
-            message = gpgmailmessage.GpgMailMessage()
-            message.set_subject(config['subject'])
-            message.set_body('Down notification for %s at %s.' % (config['url'], datetime.datetime.now()))
-            message.queue_for_sending()
-      
-        # Send e-mail if the site just came back up
-        if (current_status and not prior_status):
-            logger.info("Send up notification")
+            # Send e-mail if the site just went down
+            if (not current_status and prior_status):
+                logger.warn("Send down notification")
 
-            message = gpgmailmessage.GpgMailMessage()
-            message.set_subject(config['subject'])
-            message.set_body('Up notification for %s at %s.' % (config['url'], datetime.datetime.now()))
-            message.queue_for_sending()
-        prior_status = current_status
+                message = gpgmailmessage.GpgMailMessage()
+                message.set_subject(config['subject'])
+                message.set_body('Down notification for %s at %s.' % (config['url'], datetime.datetime.now()))
+                message.queue_for_sending()
+          
+            # Send e-mail if the site just came back up
+            if (current_status and not prior_status):
+                logger.info("Send up notification")
 
-except Exception,e:
-    logger.info("Stopping tor.")
-    logger.trace(traceback.format_exc())
-    tor_process.kill()
-    sys.exit(1)
+                message = gpgmailmessage.GpgMailMessage()
+                message.set_subject(config['subject'])
+                message.set_body('Up notification for %s at %s.' % (config['url'], datetime.datetime.now()))
+                message.queue_for_sending()
+            prior_status = current_status
+
+    except Exception as e:
+        logger.critical("Fatal %s: %s\n" % (type(e).__name__, e.message))
+        logger.error(traceback.format_exc())
+        logger.info("Stopping tor.")
+        tor_process.kill()
+        sys.exit(1)
