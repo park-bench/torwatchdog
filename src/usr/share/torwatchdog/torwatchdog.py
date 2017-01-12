@@ -20,8 +20,10 @@ import ConfigParser
 import daemon
 import datetime
 import gpgmailmessage
+import grp
 import logging
 import os
+import pwd
 import random
 import signal
 import socket
@@ -35,7 +37,6 @@ import urllib
 pid_file = '/run/torwatchdog.pid'
 
 # TODO: Consider running in a chroot or jail.
-
 # TODO: Check if network/internet connection is down
 
 config_file = ConfigParser.SafeConfigParser()
@@ -125,6 +126,18 @@ daemon_context = daemon.DaemonContext(
 daemon_context.signal_map = {
     signal.SIGTERM : sig_term_handler
     }
+
+# Set the UID and PID to parkbench-torwatchdog user and group.
+try:
+    linuxUser.getpwnam('parkbench-torwatchdog')
+except KeyError as key_error:
+    raise Exception('User parkbench-torwatchdog does not exist.', key_error)
+daemon_context.uid = linuxUser.pw_uid
+try:
+    linuxGroup.getgrnam('parkbench-torwatchdog')
+except KeyError as key_error:
+    raise Exception('Group parkbench-torwatchdog does not exist.', key_error)
+daemon_context.pid = linuxGroup.gr_gid
 
 with daemon_context:
     try:

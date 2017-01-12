@@ -15,5 +15,33 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+case "$1" in
+    configure)
+
+    # Default Linux user and group information
+    TORWATCHDOG_USER=parkbench-torwatchdog
+    TORWATCHDOG_USER_COMMENT=Tor Watchdog Daemon
+    TORWATCHDOG_GROUP=parkbench-torwatchdog
+    GPGMAILER_GROUP=parkbench-gpgmailer
+
+    # Add the torwatchdog group
+    if ! getent group "$TORWATCHDOG_GROUP" >> /dev/null; then
+        echo -n "Adding group $TORWATCHDOG_GROUP..."
+        addgroup --quiet --system "$TORWATCHDOG_GROUP" 2> /dev/null
+        echo "done"
+    fi
+
+    # Add the torwatchdog user
+    if ! getent passwd "$TORWATCHDOG_USER" >> /dev/null; then
+        echo -n "Adding system user $TORWATCHDOG_USER..."
+        adduser --quiet --system --ingroup "$TORWATCHDOG_GROUP" --no-create-home --disabled-password \
+            "$TORWATCHDOG_USER" 2> /dev/null
+        echo "done"
+    fi
+
+    # Adjust the user regardless of whether this script created the user or not
+    usermod -c "$TORWATCHDOG_USER_COMMENT" -d "/nonexistent" -g "$TORWATCHDOG_GROUP" \
+        -G "$GPGMAILER_GROUP" "$TORWATCHDOG_USER"
+
 update-rc.d torwatchdog defaults || exit 1
 invoke-rc.d torwatchdog start || exit 1
