@@ -42,6 +42,8 @@ case "$1" in
     # Adjust the user regardless of whether this script created the user or not
     usermod -c "$TORWATCHDOG_USER_COMMENT" -d "/nonexistent" -g "$TORWATCHDOG_GROUP" \
         -G "$GPGMAILER_GROUP" "$TORWATCHDOG_USER"
+    ;;
+esac
 
 update-rc.d torwatchdog defaults || exit 1
 invoke-rc.d torwatchdog start || exit 1

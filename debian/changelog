@@ -1,9 +1,14 @@
 torwatchdog (0.2) UNRELEASED; urgency=low
 
+  [ Andrew Klapp ]
   * Updated for new gpgmailer interface.
   * Updated for new confighelper release.
   * Changed install location.
   * Removed Timber dependency.
+
+  [ eviljoel ]
+  * Moved to standard Python daemon module.
+  * Added support for running as non-root user.
 
  -- Andrew Klapp <andklapp@null.net>  Wed, 13 Jul 2016 21:50:17 -0500
 
