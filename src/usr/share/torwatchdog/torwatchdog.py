@@ -96,7 +96,7 @@ config['subject'] = config_helper.verify_string_exists(config_file, 'subject')
 config['cache_dir'] = config_helper.verify_string_exists(config_file, 'cache_dir')
 
 # Read gpgmailer watch directory from the gpgmailer config file
-gpgmailmessage.configure()
+gpgmailmessage.GpgMailMessage.configure()
 
 # Make the Tor cache directory
 if not os.path.exists(config['cache_dir']):
