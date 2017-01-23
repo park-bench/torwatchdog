@@ -23,6 +23,7 @@ import gpgmailmessage
 import grp
 import logging
 import os
+from daemon import pidlockfile
 import pwd
 import random
 import signal
