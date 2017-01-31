@@ -126,7 +126,10 @@ def is_site_up(url):
         return True
     except Exception as detail:
         logger.warn("Unable to reach %s." % url)
-        logger.warn("Exception: %s" % traceback.format_exc())
+        # The current version of socksipy contains a bug that causes this
+        #   message to raise the wrong kind of exception and print an unhelpful
+        #   message. It has been fixed in Ubuntu 16.04.
+        logger.trace("Exception: %s" % traceback.format_exc())
         return False
 
 # Start an instance of Tor. This prints
