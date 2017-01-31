@@ -24,9 +24,9 @@ installing your own package. We make the following assumptions:
 *    You already know how to use GnuPG.
 *    You are already somewhat familiar with using debuild.
 
-Clone the latest release tag, not the master branch, as master may not be
-stable. Build the package with debuild from the project directory and install
-with dpkg -i. Resolve any missing dependencies with apt-get -f install. The
+Clone the latest release tag, not the `master` branch, as `master` may not be
+stable. Build the package with `debuild` from the project directory and install
+with `dpkg -i`. Resolve any missing dependencies with `apt-get -f install`. The
 daemon will attempt to start and fail.
 
 Updates may change configuration file options, so if you have a configuration
