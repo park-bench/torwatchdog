@@ -128,17 +128,19 @@ daemon_context.signal_map = {
     signal.SIGTERM : sig_term_handler
     }
 
+daemon_context.files_preserve = [config_helper.get_log_file_handle()]
+
 # Set the UID and PID to parkbench-torwatchdog user and group.
 try:
-    linuxUser.getpwnam('parkbench-torwatchdog')
+    linuxUser = pwd.getpwnam('parkbench-torwatchdog')
 except KeyError as key_error:
     raise Exception('User parkbench-torwatchdog does not exist.', key_error)
 daemon_context.uid = linuxUser.pw_uid
 try:
-    linuxGroup.getgrnam('parkbench-torwatchdog')
+    linuxGroup = grp.getgrnam('parkbench-torwatchdog')
 except KeyError as key_error:
     raise Exception('Group parkbench-torwatchdog does not exist.', key_error)
-daemon_context.pid = linuxGroup.gr_gid
+daemon_context.gid = linuxGroup.gr_gid
 
 with daemon_context:
     try:

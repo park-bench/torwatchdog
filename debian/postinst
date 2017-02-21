@@ -19,10 +19,10 @@ case "$1" in
     configure)
 
     # Default Linux user and group information
-    TORWATCHDOG_USER=parkbench-torwatchdog
-    TORWATCHDOG_USER_COMMENT=Tor Watchdog Daemon
-    TORWATCHDOG_GROUP=parkbench-torwatchdog
-    GPGMAILER_GROUP=parkbench-gpgmailer
+    TORWATCHDOG_USER='parkbench-torwatchdog'
+    TORWATCHDOG_USER_COMMENT='Tor Watchdog Daemon'
+    TORWATCHDOG_GROUP='parkbench-torwatchdog'
+    GPGMAILER_GROUP='parkbench-gpgmailer'
 
     # Add the torwatchdog group
     if ! getent group "$TORWATCHDOG_GROUP" >> /dev/null; then
