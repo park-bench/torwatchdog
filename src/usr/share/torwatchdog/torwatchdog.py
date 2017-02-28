@@ -29,16 +29,19 @@ import random
 import signal
 import socket
 import socks  # SocksiPy module
+import stat
 import stem.process
 import sys
 import time
 import traceback
 import urllib
 
-pid_file = '/run/torwatchdog.pid'
+pid_file = 'torwatchdog.pid'
+pid_dir = '/run/torwatchdog'  # TODO: Pick directoy.
 
 # TODO: Consider running in a chroot or jail.
 # TODO: Check if network/internet connection is down
+# TODO: We need to do more to make sure the tor process gets shutdown if something wrong occurs during init.
 
 config_file = ConfigParser.SafeConfigParser()
 config_file.read('/etc/torwatchdog/torwatchdog.conf')
@@ -108,6 +111,7 @@ tor_process = stem.process.launch_tor_with_config(
         'DataDirectory': config['cache_dir'],
     },
     init_msg_handler = print_bootstrap_lines,
+    take_ownership = True
 )
 
 # Quit when SIGTERM is received
@@ -120,7 +124,7 @@ def sig_term_handler(signal, stack_frame):
 # TODO: Work out a permissions setup for this program so that it doesn't run as root.
 daemon_context = daemon.DaemonContext(
     working_directory = '/',
-    pidfile = pidlockfile.PIDLockFile(pid_file),
+    pidfile = pidlockfile.PIDLockFile(os.path.join(pid_dir, pid_file)),
     umask = 0o033
     )
 
@@ -141,6 +145,13 @@ try:
 except KeyError as key_error:
     raise Exception('Group parkbench-torwatchdog does not exist.', key_error)
 daemon_context.gid = linuxGroup.gr_gid
+
+# Non-root users cannot create files in /run, so create a directory that can be written to.
+pid_mode = stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR;  # Full access to user only.
+if not os.path.isdir(pid_dir):
+    os.makedirs(pid_dir, pid_mode)
+os.chown(pid_dir, linuxUser.pw_uid, linuxGroup.gr_gid)
+os.chmod(pid_dir, pid_mode)
 
 with daemon_context:
     try:

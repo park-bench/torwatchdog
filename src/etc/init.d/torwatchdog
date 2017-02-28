@@ -18,7 +18,7 @@ PATH=/sbin:/usr/sbin:/bin:/usr/bin
 DESC="Tor Hidden Service Watchdog"
 NAME=torwatchdog
 DAEMON=/usr/share/torwatchdog/$NAME.py
-PIDFILE=/run/$NAME.pid
+PIDFILE=/run/$NAME/$NAME.pid
 SCRIPTNAME=/etc/init.d/$NAME
 
 # Exit if the package is not installed
