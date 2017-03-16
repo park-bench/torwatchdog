@@ -38,6 +38,8 @@ import urllib
 
 pid_file = 'torwatchdog.pid'
 pid_dir = '/run/torwatchdog'  # TODO: Pick directoy.
+process_username = 'parkbench-torwatchdog'  # TODO: Decide if this name is final.
+process_group_name = 'parkbench-torwatchdog'  # TODO: Decide if this name is final.
 
 # TODO: Consider running in a chroot or jail.
 # TODO: Check if network/internet connection is down
@@ -64,14 +66,32 @@ config['avg_delay'] = config_helper.verify_number_exists(config_file, 'avg_delay
 config['subject'] = config_helper.verify_string_exists(config_file, 'subject')
 config['cache_dir'] = config_helper.verify_string_exists(config_file, 'cache_dir')
 
+# Read gpgmailer watch directory from the gpgmailer config file
+gpgmailmessage.GpgMailMessage.configure()
+
+# Get user and group information for dropping privileges.
+try:
+    linuxUser = pwd.getpwnam(process_username)
+except KeyError as key_error:
+    raise Exception('User parkbench-torwatchdog does not exist.', key_error)
+try:
+    linuxGroup = grp.getgrnam(process_group_name)
+except KeyError as key_error:
+    raise Exception('Group parkbench-torwatchdog does not exist.', key_error)
+
 # Make the Tor cache directory
-if not os.path.exists(config['cache_dir']):
+tor_dir_mode = stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR;  # Full access to user only.
+if not os.path.isdir(config['cache_dir']):
     logger.info('Creating Tor cache directory.')
     os.makedirs(config['cache_dir'])
+    os.makedirs(pid_dir, tor_dir_mode)
+os.chown(config['cache_dir'], linuxUser.pw_uid, linuxGroup.gr_gid)
+os.chmod(config['cache_dir'], tor_dir_mode)
 
 prior_status = True # Start the program assuming the website is up.
 
 # Set socks proxy and wrap the urllib module
+# TODO: Consider choosing a randomly available TCP port.
 socks.setdefaultproxy(socks.PROXY_TYPE_SOCKS5, '127.0.0.1', int(config['socks_port']))
 socket.socket = socks.socksocket
 
@@ -109,9 +129,11 @@ tor_process = stem.process.launch_tor_with_config(
     config = {
         'SocksPort': str(config['socks_port']),
         'DataDirectory': config['cache_dir'],
+        'User': process_username,
     },
-    init_msg_handler = print_bootstrap_lines,
-    take_ownership = True
+    init_msg_handler = print_bootstrap_lines
+    # TODO: The following doesn't work right with forking:
+    #take_ownership = True
 )
 
 # Quit when SIGTERM is received
@@ -125,7 +147,7 @@ def sig_term_handler(signal, stack_frame):
 daemon_context = daemon.DaemonContext(
     working_directory = '/',
     pidfile = pidlockfile.PIDLockFile(os.path.join(pid_dir, pid_file)),
-    umask = 0o033
+    umask = 0o117  # Read/write by user and group.
     )
 
 daemon_context.signal_map = {
@@ -135,15 +157,7 @@ daemon_context.signal_map = {
 daemon_context.files_preserve = [config_helper.get_log_file_handle()]
 
 # Set the UID and PID to parkbench-torwatchdog user and group.
-try:
-    linuxUser = pwd.getpwnam('parkbench-torwatchdog')
-except KeyError as key_error:
-    raise Exception('User parkbench-torwatchdog does not exist.', key_error)
 daemon_context.uid = linuxUser.pw_uid
-try:
-    linuxGroup = grp.getgrnam('parkbench-torwatchdog')
-except KeyError as key_error:
-    raise Exception('Group parkbench-torwatchdog does not exist.', key_error)
 daemon_context.gid = linuxGroup.gr_gid
 
 # Non-root users cannot create files in /run, so create a directory that can be written to.
@@ -152,6 +166,10 @@ if not os.path.isdir(pid_dir):
     os.makedirs(pid_dir, pid_mode)
 os.chown(pid_dir, linuxUser.pw_uid, linuxGroup.gr_gid)
 os.chmod(pid_dir, pid_mode)
+
+# For some reason the daemon context doesn't set the supplementary groups.
+# You are also suppose to include the primary groups as a supplementary group.
+os.initgroups(process_username, linuxGroup.gr_gid)
 
 with daemon_context:
     try:
