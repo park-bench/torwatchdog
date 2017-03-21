@@ -4,12 +4,14 @@
 [General]
 
 # Log file
-log_file=/var/log/torwatchdog.log
+log_file=/var/log/torwatchdog/torwatchdog.log
 
 # Log level
 log_level=info
 
 # Tor cache directory
+# TODO: This should probably be called tor_data_dir or something. It is more than a cache.
+# TODO: I'm unconvinced this is the right location. Maybe a RAM disk is better? Maybe it shouldn't be deleted for performance?
 cache_dir=/tmp/torwatchdog/cache
 
 # The URL that torwatchdog checks

@@ -45,6 +45,18 @@ process_group_name = 'parkbench-torwatchdog'  # TODO: Decide if this name is fin
 # TODO: Check if network/internet connection is down
 # TODO: We need to do more to make sure the tor process gets shutdown if something wrong occurs during init.
 
+# Get user and group information for dropping privileges.
+try:
+    linuxUser = pwd.getpwnam(process_username)
+except KeyError as key_error:
+    raise Exception('User parkbench-torwatchdog does not exist.', key_error)
+try:
+    linuxGroup = grp.getgrnam(process_group_name)
+except KeyError as key_error:
+    raise Exception('Group parkbench-torwatchdog does not exist.', key_error)
+escalated_uid = os.getuid()
+escalated_gid = os.getgid()
+
 config_file = ConfigParser.SafeConfigParser()
 config_file.read('/etc/torwatchdog/torwatchdog.conf')
 
@@ -53,6 +65,9 @@ config_helper = confighelper.ConfigHelper()
 log_file = config_helper.verify_string_exists_prelogging(config_file, 'log_file')
 log_level = config_helper.verify_string_exists_prelogging(config_file, 'log_level')
 
+# Temporarily drop permission and create the handle to the logger.
+os.setegid(linuxGroup.gr_gid)
+os.seteuid(linuxUser.pw_uid)
 config_helper.configure_logger(log_file, log_level)
 
 logger = logging.getLogger()
@@ -67,17 +82,21 @@ config['subject'] = config_helper.verify_string_exists(config_file, 'subject')
 config['cache_dir'] = config_helper.verify_string_exists(config_file, 'cache_dir')
 
 # Read gpgmailer watch directory from the gpgmailer config file
+os.seteuid(escalated_uid)
+os.setegid(escalated_gid)
 gpgmailmessage.GpgMailMessage.configure()
 
-# Get user and group information for dropping privileges.
-try:
-    linuxUser = pwd.getpwnam(process_username)
-except KeyError as key_error:
-    raise Exception('User parkbench-torwatchdog does not exist.', key_error)
-try:
-    linuxGroup = grp.getgrnam(process_group_name)
-except KeyError as key_error:
-    raise Exception('Group parkbench-torwatchdog does not exist.', key_error)
+# Non-root users cannot create files in /run, so create a directory that can be written to.
+pid_mode = stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR;  # Full access to user only.
+if not os.path.isdir(pid_dir):
+    os.makedirs(pid_dir, pid_mode)
+os.chown(pid_dir, linuxUser.pw_uid, linuxGroup.gr_gid)
+os.chmod(pid_dir, pid_mode)
+
+# Configuration has been read. Now drop permissions forever.
+os.initgroups(process_username, linuxGroup.gr_gid)
+os.setgid(linuxGroup.gr_gid)
+os.setuid(linuxUser.pw_uid)
 
 # Make the Tor cache directory
 tor_dir_mode = stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR;  # Full access to user only.
@@ -129,9 +148,9 @@ tor_process = stem.process.launch_tor_with_config(
     config = {
         'SocksPort': str(config['socks_port']),
         'DataDirectory': config['cache_dir'],
-        'User': process_username,
+#        'User': process_username,
     },
-    init_msg_handler = print_bootstrap_lines
+    init_msg_handler = print_bootstrap_lines,
     # TODO: The following doesn't work right with forking:
     #take_ownership = True
 )
@@ -159,17 +178,6 @@ daemon_context.files_preserve = [config_helper.get_log_file_handle()]
 # Set the UID and PID to parkbench-torwatchdog user and group.
 daemon_context.uid = linuxUser.pw_uid
 daemon_context.gid = linuxGroup.gr_gid
-
-# Non-root users cannot create files in /run, so create a directory that can be written to.
-pid_mode = stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR;  # Full access to user only.
-if not os.path.isdir(pid_dir):
-    os.makedirs(pid_dir, pid_mode)
-os.chown(pid_dir, linuxUser.pw_uid, linuxGroup.gr_gid)
-os.chmod(pid_dir, pid_mode)
-
-# For some reason the daemon context doesn't set the supplementary groups.
-# You are also suppose to include the primary groups as a supplementary group.
-os.initgroups(process_username, linuxGroup.gr_gid)
 
 with daemon_context:
     try:
