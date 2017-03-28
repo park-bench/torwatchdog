@@ -37,9 +37,10 @@ import traceback
 import urllib
 
 pid_file = 'torwatchdog.pid'
-pid_dir = '/run/torwatchdog'  # TODO: Pick directoy.
-process_username = 'parkbench-torwatchdog'  # TODO: Decide if this name is final.
-process_group_name = 'parkbench-torwatchdog'  # TODO: Decide if this name is final.
+pid_dir = '/run/torwatchdog'
+log_file = 'torwatchdog.log'
+process_username = 'torwatchdog'
+process_group_name = 'torwatchdog'
 
 # TODO: Consider running in a chroot or jail.
 # TODO: Check if network/internet connection is down
@@ -49,11 +50,11 @@ process_group_name = 'parkbench-torwatchdog'  # TODO: Decide if this name is fin
 try:
     linuxUser = pwd.getpwnam(process_username)
 except KeyError as key_error:
-    raise Exception('User parkbench-torwatchdog does not exist.', key_error)
+    raise Exception('User %s does not exist.' % process_username, key_error)
 try:
     linuxGroup = grp.getgrnam(process_group_name)
 except KeyError as key_error:
-    raise Exception('Group parkbench-torwatchdog does not exist.', key_error)
+    raise Exception('Group %s does not exist.' % process_group_name, key_error)
 escalated_uid = os.getuid()
 escalated_gid = os.getgid()
 
@@ -62,13 +63,22 @@ config_file.read('/etc/torwatchdog/torwatchdog.conf')
 
 # Logging config goes first
 config_helper = confighelper.ConfigHelper()
-log_file = config_helper.verify_string_exists_prelogging(config_file, 'log_file')
+log_dir = config_helper.verify_string_exists_prelogging(config_file, 'log_dir')
 log_level = config_helper.verify_string_exists_prelogging(config_file, 'log_level')
+
+# Create the logging directory
+# Full access to user, others can read and traverse.
+log_mode = stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH
+if not os.path.isdir(log_dir):
+    print('Creating the logging directory %s.', log_dir)
+    os.makedirs(log_dir, log_mode)
+os.chown(log_dir, linuxUser.pw_uid, linuxGroup.gr_gid)
+os.chmod(log_dir, log_mode)
 
 # Temporarily drop permission and create the handle to the logger.
 os.setegid(linuxGroup.gr_gid)
 os.seteuid(linuxUser.pw_uid)
-config_helper.configure_logger(log_file, log_level)
+config_helper.configure_logger(os.join(log_dir, log_file), log_level)
 
 logger = logging.getLogger()
 
@@ -76,10 +86,10 @@ logger.info('Verifying non-logging config')
 config = {}
 
 config['url'] = config_helper.verify_string_exists(config_file, 'url')
-config['socks_port'] = config_helper.verify_integer_exists(config_file, 'socks_port')
+config['tor_data_dir'] = config_helper.verify_string_exists(config_file, 'tor_data_dir')
+config['tor_socks_port'] = config_helper.verify_integer_exists(config_file, 'tor_socks_port')
 config['avg_delay'] = config_helper.verify_number_exists(config_file, 'avg_delay')
-config['subject'] = config_helper.verify_string_exists(config_file, 'subject')
-config['cache_dir'] = config_helper.verify_string_exists(config_file, 'cache_dir')
+config['email_subject'] = config_helper.verify_string_exists(config_file, 'email_subject')
 
 # Read gpgmailer watch directory from the gpgmailer config file
 os.seteuid(escalated_uid)
@@ -98,20 +108,20 @@ os.initgroups(process_username, linuxGroup.gr_gid)
 os.setgid(linuxGroup.gr_gid)
 os.setuid(linuxUser.pw_uid)
 
-# Make the Tor cache directory
+# Make the Tor data directory
 tor_dir_mode = stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR;  # Full access to user only.
-if not os.path.isdir(config['cache_dir']):
-    logger.info('Creating Tor cache directory.')
-    os.makedirs(config['cache_dir'])
+if not os.path.isdir(config['tor_data_dir']):
+    logger.info('Creating Tor data directory.')
+    os.makedirs(config['tor_data_dir'])
     os.makedirs(pid_dir, tor_dir_mode)
-os.chown(config['cache_dir'], linuxUser.pw_uid, linuxGroup.gr_gid)
-os.chmod(config['cache_dir'], tor_dir_mode)
+os.chown(config['tor_data_dir'], linuxUser.pw_uid, linuxGroup.gr_gid)
+os.chmod(config['tor_data_dir'], tor_dir_mode)
 
 prior_status = True # Start the program assuming the website is up.
 
 # Set socks proxy and wrap the urllib module
 # TODO: Consider choosing a randomly available TCP port.
-socks.setdefaultproxy(socks.PROXY_TYPE_SOCKS5, '127.0.0.1', int(config['socks_port']))
+socks.setdefaultproxy(socks.PROXY_TYPE_SOCKS5, '127.0.0.1', int(config['tor_socks_port']))
 socket.socket = socks.socksocket
 
 # Perform DNS resolution through the socket
@@ -147,7 +157,7 @@ logger.info("Starting Tor on port %s." % config['socks_port'])
 tor_process = stem.process.launch_tor_with_config(
     config = {
         'SocksPort': str(config['socks_port']),
-        'DataDirectory': config['cache_dir'],
+        'DataDirectory': config['tor_data_dir'],
 #        'User': process_username,
     },
     init_msg_handler = print_bootstrap_lines,
@@ -156,13 +166,11 @@ tor_process = stem.process.launch_tor_with_config(
 )
 
 # Quit when SIGTERM is received
-# TODO: Delete the cache directory on exit
 def sig_term_handler(signal, stack_frame):
     logger.info("Stopping tor.")
     tor_process.kill()
     sys.exit(0)
 
-# TODO: Work out a permissions setup for this program so that it doesn't run as root.
 daemon_context = daemon.DaemonContext(
     working_directory = '/',
     pidfile = pidlockfile.PIDLockFile(os.path.join(pid_dir, pid_file)),
@@ -201,7 +209,7 @@ with daemon_context:
                 logger.warn("Send down notification")
 
                 message = gpgmailmessage.GpgMailMessage()
-                message.set_subject(config['subject'])
+                message.set_subject(config['email_subject'])
                 message.set_body('Down notification for %s at %s.' % (config['url'], datetime.datetime.now()))
                 message.queue_for_sending()
           
@@ -210,7 +218,7 @@ with daemon_context:
                 logger.info("Send up notification")
 
                 message = gpgmailmessage.GpgMailMessage()
-                message.set_subject(config['subject'])
+                message.set_subject(config['email_subject'])
                 message.set_body('Up notification for %s at %s.' % (config['url'], datetime.datetime.now()))
                 message.queue_for_sending()
             prior_status = current_status

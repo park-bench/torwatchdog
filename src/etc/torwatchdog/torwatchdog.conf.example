@@ -3,25 +3,23 @@
 
 [General]
 
-# Log file
-log_file=/var/log/torwatchdog/torwatchdog.log
+# Logging directory
+log_dir=/var/log/torwatchdog
 
 # Log level
 log_level=info
 
 # Tor cache directory
-# TODO: This should probably be called tor_data_dir or something. It is more than a cache.
-# TODO: I'm unconvinced this is the right location. Maybe a RAM disk is better? Maybe it shouldn't be deleted for performance?
-cache_dir=/tmp/torwatchdog/cache
+tor_data_dir=/var/cache/torwatchdog/tor
 
 # The URL that torwatchdog checks
 url=
 
-# Tor will listen on this port
-socks_port=7000
+# Tor will listen on this port. (Default randomly chosen by developer.)
+socks_port=6613
 
 # Average delay between checks, in seconds
 avg_delay=300
 
-# Subject line, an arbitary string. Subject lines are not encrypted
+# Subject line, an arbitary string. Subject lines are NOT encrypted
 subject=
