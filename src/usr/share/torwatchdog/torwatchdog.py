@@ -15,6 +15,10 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+# Verifies a website is running over Tor and sends an encrypted e-mail
+#   notification when the site's availability changes. Uses urllib to
+#   fetch the site using SocksiPy for Tor over the SOCKS_PORT.
+
 # TODO: Consider running in a chroot or jail.
 # TODO: Check if network/internet connection is down
 
@@ -64,6 +68,12 @@ def get_user_and_group_ids():
     return (program_user.pw_uid, program_group.gr_gid)
 
 
+# Reads the configuration file and creates the application logger. This is done in the
+#   same function because part of the logger creation is dependent upon reading the
+#   configuration file.
+#
+# program_uid The system user ID this program should drop to before daemonization.
+# program_gid The system group ID this program should drop to before daemonization.
 def read_configuration_and_create_logger(program_uid, program_gid):
     config_parser = ConfigParser.SafeConfigParser()
     config_parser.read(configuration_pathname)
@@ -91,6 +101,12 @@ def read_configuration_and_create_logger(program_uid, program_gid):
     return (config, config_helper, logger)
 
 
+# Creates a directory if it does not exist and sets the specified ownership and permissions.
+#
+# path: The pathname of the directory to create. Will create intermediate directories.
+# uid: The system user ID that should own the directory.
+# gid: The system group ID that should own be associated with the directory.
+# mode: The umask of the directory access permissions.
 def create_directory(path, uid, gid, mode):
     logger.info('Creating directory %s.' % path)
     if not os.path.isdir(path):
@@ -100,6 +116,10 @@ def create_directory(path, uid, gid, mode):
     os.chmod(path, mode)
 
 
+# Drops escalated permissions forever to the specified user and group.
+#
+# uid: The system user ID to drop to.
+# gid: The system group ID to drop to.
 def drop_permissions_forever(uid, gid):
     logger.info('Dropping permissions for user %s.' % process_username)
     os.initgroups(process_username, gid)
@@ -107,20 +127,27 @@ def drop_permissions_forever(uid, gid):
     os.setuid(uid)
 
 
-def initialize_tor(config):
+# Configures the tor proxy settings.
+#
+# config: The program configuration object, mostly based on the configuration file.
+def configure_tor_proxy(config):
     # Set socks proxy and wrap the urllib module
     # TODO: Consider choosing a randomly available TCP port.
     socks.setdefaultproxy(socks.PROXY_TYPE_SOCKS5, '127.0.0.1', int(config['tor_socks_port']))
     socket.socket = socks.socksocket
-    socket.getaddrinfo = get_address_info
+    socket.getaddrinfo = lamdba *args: [(socket.AF_INET, socket.SOCK_STREAM, 6, '', (args[0], args[1]))]
 
 
 # Perform DNS resolution through the socket
 # TODO: Consider inlining.
-def get_address_info(*args):
-    return [(socket.AF_INET, socket.SOCK_STREAM, 6, '', (args[0], args[1]))]
+#def get_address_info(*args):
+#    return [(socket.AF_INET, socket.SOCK_STREAM, 6, '', (args[0], args[1]))]
 
 
+# Creates the daemon context. Currently specifies daemon permissions, PID file information, and
+#   signal handler.
+#
+# log_file_handle: The file handle to the log file.
 def setup_daemon_context(log_file_handle):
 
     daemon_context = daemon.DaemonContext(
@@ -142,6 +169,9 @@ def setup_daemon_context(log_file_handle):
     return daemon_context
 
 
+# Starts the tor process.
+#
+# config: The program configuration object, mostly based on the configuration file.
 def start_tor(config):
 
     # Note that the 'take_ownership' option does not work correctly after forking.
@@ -151,22 +181,28 @@ def start_tor(config):
     }
      
     logger.info("Starting Tor on port %s." % config['socks_port'])
-    tor_process = stem.process.launch_tor_with_config(tor_config, init_msg_handler = print_bootstrap_lines)
+    tor_process = stem.process.launch_tor_with_config(
+        tor_config, 
+        init_msg_handler = if "Bootstrapped " in line: logger.info("%s" % line))
 
     return tor_process
 
 
 # Start an instance of Tor. This prints Tor's bootstrap information as it starts.
 # TODO: Consider inlining.
-def print_bootstrap_lines(line):
-    if "Bootstrapped " in line:
-        logger.info("%s" % line);
+#def print_bootstrap_lines(line):
+#    if "Bootstrapped " in line:
+#        logger.info("%s" % line)
 
 
-# Uses urllib to fetch a site using SocksiPy for Tor over the SOCKS_PORT.
+# The main program loop.
+#
+# config: The program configuration object, mostly based on the configuration file.
 def main_loop(config):
 
-    prior_status = True # Start the program assuming the website is up.
+    random.SystemRandom()  # Uses /dev/urandom, for determining how long to sleep the main loop.
+
+    prior_status = True  # Start the program assuming the website is up.
     
     logger.trace('Starting loop.')
 
@@ -200,6 +236,9 @@ def main_loop(config):
         prior_status = current_status
 
 
+# Checks if the specified website is available over Tor.
+#
+# url: The website to check for availability.
 def is_site_up(url):
 
     logger.debug('Checkin url %s.' % url)
@@ -217,7 +256,7 @@ def is_site_up(url):
     logger.trace('Done checking url %s.' % url)
 
 
-# Quit when SIGTERM is received
+# Signal handler for SIGTERM. Kills Tor and quits when SIGTERM is received.
 def sig_term_handler(signal, stack_frame):
     if tor_process != None:
         logger.info("Stopping tor.")
@@ -248,14 +287,11 @@ try:
     # Configuration has been read and directories setup. Now drop permissions forever.
     drop_permissions_forever(program_uid, program_gid)
 
-    random.SystemRandom()  # Uses /dev/urandom, for determining how long to sleep the main loop.
-
-    initialize_tor(config)
+    configure_tor_proxy(config)
 
     daemon_context = setup_daemon_context(config_helper.get_log_file_handle())
 
     tor_process = None
-
     tor_process = start_tor(config)
 
     with daemon_context:
