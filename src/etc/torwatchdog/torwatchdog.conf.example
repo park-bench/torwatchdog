@@ -3,23 +3,17 @@
 
 [General]
 
-# Logging directory
-log_dir=/var/log/torwatchdog
-
-# Log level
+# Log level.
 log_level=info
 
-# Tor cache directory
-tor_data_dir=/var/cache/torwatchdog/tor
-
-# The URL that torwatchdog checks
+# The URL that torwatchdog checks.
 url=
 
 # Tor will listen on this port. (Default randomly chosen by developer.)
-socks_port=6613
+tor_socks_port=6613
 
-# Average delay between checks, in seconds
-avg_delay=300
+# Average delay between checks, in seconds.
+average_delay=300
 
-# Subject line, an arbitary string. Subject lines are NOT encrypted
-subject=
+# Subject line, an arbitary string. Subject lines are NOT encrypted.
+email_subject=
