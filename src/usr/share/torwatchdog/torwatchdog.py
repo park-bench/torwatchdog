@@ -30,12 +30,16 @@ import gpgmailmessage
 import grp
 import logging
 import os
-from lockfile import pidlockfile
+# TODO: Remove try/except when we drop support for Ubuntu 14.04 LTS.
+try:
+    from lockfile import pidlockfile
+except ImportError:
+    from daemon import pidlockfile
 import pwd
 import random
 import signal
 import socket
-import socks  # SocksiPy module
+import socks
 import stat
 import stem.process
 import sys
@@ -121,8 +125,8 @@ def read_configuration_and_create_logger(program_uid, program_gid):
 #
 # system_path: The system path that the directories should be created under. These are assumed to
 #   already exist. The ownership and permissions on these directories are not modified.
-# program_dirs: Additional directories that should be created under the system path that should take
-#   on the following ownership and permissions.
+# program_dirs: A string representing additional directories that should be created under the system
+#   path that should take on the following ownership and permissions.
 # uid: The system user ID that should own the directory.
 # gid: The system group ID that should own be associated with the directory.
 # mode: The umask of the directory access permissions.
@@ -161,7 +165,7 @@ def configure_tor_proxy(config):
     socket.getaddrinfo = lambda *args : [(socket.AF_INET, socket.SOCK_STREAM, 6, '', (args[0], args[1]))]
 
 
-# Creates the daemon context. Currently specifies daemon permissions, PID file information, and
+# Creates the daemon context. Specifies daemon permissions, PID file information, and
 #   signal handler.
 #
 # log_file_handle: The file handle to the log file.
@@ -179,7 +183,7 @@ def setup_daemon_context(log_file_handle, program_uid, program_gid):
 
     daemon_context.files_preserve = [log_file_handle]
 
-    # Set the UID and PID to parkbench-torwatchdog user and group.
+    # Set the UID and PID to 'torwatchdog' user and group.
     daemon_context.uid = program_uid
     daemon_context.gid = program_gid
 
@@ -236,33 +240,34 @@ def main_loop(config):
         # Send e-mail if the site just went down
         if (not current_status and prior_status):
             message = 'Down notification for %s at %s.' % (config['url'], datetime.datetime.now())
-            logger.warn(message)
-
-            try:
-                mail_message = gpgmailmessage.GpgMailMessage()
-                mail_message.set_subject(config['email_subject'])
-                mail_message.set_body(message)
-                mail_message.queue_for_sending()
-            except Exception as detail:
-                logger.error('Could not send down notification. %s: %s',
-                    (type(detail).__name__, detail.message))
-                logger.error(traceback.format_exc())
+            email_error_message = 'Could not send down notification.'
+            log_and_send_message(config, message, email_error_message)
       
         # Send e-mail if the site just came back up
         if (current_status and not prior_status):
             message = 'Up notification for %s at %s.' % (config['url'], datetime.datetime.now())
-            logger.warn(message)
+            email_error_message = 'Could not send up notification.'
+            log_and_send_message(config, message, email_error_message)
 
-            try:
-                mail_message = gpgmailmessage.GpgMailMessage()
-                mail_message.set_subject(config['email_subject'])
-                mail_message.set_body(message)
-                mail_message.queue_for_sending()
-            except Exception as detail:
-                logger.error('Could not send up notification. %s: %s',
-                    (type(detail).__name__, detail.message))
-                logger.error(traceback.format_exc())
         prior_status = current_status
+
+
+# Logs and sends an e-mail of a message.
+#
+# config: The program configuration object, mostly based on the configuration file.
+# message: The message.
+# email_error_message: A message to log in the event of an error while sending the e-mail.
+def log_and_send_message(config, message, email_error_message):
+    logger.warn(message)
+
+    try:
+        mail_message = gpgmailmessage.GpgMailMessage()
+        mail_message.set_subject(config['email_subject'])
+        mail_message.set_body(message)
+        mail_message.queue_for_sending()
+    except Exception as detail:
+        logger.error('%s %s: %s', email_error_message, (type(detail).__name__, detail.message))
+        logger.error(traceback.format_exc())
 
 
 # Checks if the specified website is available over Tor.

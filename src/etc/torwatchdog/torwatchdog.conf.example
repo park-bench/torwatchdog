@@ -3,7 +3,8 @@
 
 [General]
 
-# Log level.
+# The amount of logging detail. Either of critical, error, warn, info, debug,
+#   or trace.
 log_level=info
 
 # The URL that torwatchdog checks.
