@@ -62,6 +62,8 @@ process_group_name = program_name
 
 
 # Get user and group information for dropping privileges.
+#
+# Returns the user and group IDs that the program should eventually run as.
 def get_user_and_group_ids():
     try:
         program_user = pwd.getpwnam(process_username)
@@ -81,6 +83,7 @@ def get_user_and_group_ids():
 #
 # program_uid: The system user ID this program should drop to before daemonization.
 # program_gid: The system group ID this program should drop to before daemonization.
+# Returns the read system config, a confighelper instance, and a logger instance.
 def read_configuration_and_create_logger(program_uid, program_gid):
     config_parser = ConfigParser.SafeConfigParser()
     config_parser.read(configuration_pathname)
@@ -169,6 +172,7 @@ def configure_tor_proxy(config):
 #   signal handler.
 #
 # log_file_handle: The file handle to the log file.
+# Returns the daemon context.
 def setup_daemon_context(log_file_handle, program_uid, program_gid):
 
     daemon_context = daemon.DaemonContext(
@@ -190,9 +194,34 @@ def setup_daemon_context(log_file_handle, program_uid, program_gid):
     return daemon_context
 
 
+# Starts the tor process prior to daemonization. If the tor process fails too quickly, we assume tor
+#   is configured incorrectly and the program quits. Else, the program will keep trying to connect to
+#   tor.
+#
+# config: The program configuration object, mostly based on the configuration file.
+# Returns a handle to the tor process.
+def start_tor_before_daemonize(config):
+
+    tor_process = None
+    start_time = datetime.datetime.now()
+    try:
+        tor_process = start_tor(config)
+    except OSError as os_error:
+        end_time = datetime.datetime.now()
+        fail_time = end_time - start_time
+
+        # If tor quit in less than 30 seconds, assume something is misconfigured.
+        if fail_time < datetime.timedelta(seconds=30):
+            raise RuntimeError('Tor failed to start in only %d seconds. Assuming the program is ' +
+                'misconfigured. Quitting.' % fail_time, os_error)
+
+    return tor_process
+
+
 # Starts the tor process.
 #
 # config: The program configuration object, mostly based on the configuration file.
+# Returns a handle to the tor process.
 def start_tor(config):
 
     # Note that the 'take_ownership' option does not work correctly after forking.
@@ -219,7 +248,19 @@ def print_bootstrap_lines(line):
 # The main program loop.
 #
 # config: The program configuration object, mostly based on the configuration file.
-def main_loop(config):
+# tor_process: A handle to the tor process.
+def main_loop(config, tor_process):
+
+    # If tor hasn't started, keep trying.
+    while tor_process is None:
+        try:
+            tor_process = start_tor(config)
+        except Exception as exception:
+            logger.error('Failed to start tor: %s: %s' % (type(exception).__name__, 
+                exception.message))
+            logger.error(traceback.format_exc())
+            logger.error('Will try to connect again in 1 second.')
+            time.sleep(1)
 
     random.SystemRandom()  # Uses /dev/urandom, for determining how long to sleep the main loop.
 
@@ -294,6 +335,7 @@ def is_site_up(url):
 # signal: Object representing the signal thrown.
 # stack_frame: Represents the stack frame.
 def sig_term_handler(signal, stack_frame):
+    logger.info("Received SIGTERM, quitting.")
     if tor_process != None:
         logger.info('Stopping tor.')
         tor_process.kill()
@@ -326,10 +368,10 @@ try:
 
     daemon_context = setup_daemon_context(config_helper.get_log_file_handle(), program_uid, program_gid)
 
-    tor_process = start_tor(config)
+    tor_process = start_tor_before_daemonize(config)
 
     with daemon_context:
-        main_loop(config)
+        main_loop(config, tor_process)
  
 except Exception as e:
     logger.critical('Fatal %s: %s\n' % (type(e).__name__, e.message))
