@@ -23,3 +23,9 @@ avg_delay=300
 
 # Subject line, an arbitary string. Subject lines are not encrypted
 subject=
+
+# Comma-separated list of recipients for torwatchdog emails. Cannot be empty.
+recipient_emails=
+
+# Comma-separated list of gpg key fingerprints for recipients of torwatchdog emails. Cannot be empty.
+recipient_keys=

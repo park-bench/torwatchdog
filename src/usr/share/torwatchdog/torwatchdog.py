@@ -94,6 +94,8 @@ config['socks_port'] = config_helper.verify_integer_exists(config_file, 'socks_p
 config['avg_delay'] = config_helper.verify_number_exists(config_file, 'avg_delay')
 config['subject'] = config_helper.verify_string_exists(config_file, 'subject')
 config['cache_dir'] = config_helper.verify_string_exists(config_file, 'cache_dir')
+config['recipient_emails'] = config_helper.verify_string_list_exists(config_file, 'recipient_emails')
+config['recipient_keys'] = config_helper.verify_string_list_exists(config_file, 'recipient_keys')
 
 # Read gpgmailer watch directory from the gpgmailer config file
 gpgmailmessage.GpgMailMessage.configure()
@@ -184,6 +186,8 @@ try:
             message = gpgmailmessage.GpgMailMessage()
             message.set_subject(config['subject'])
             message.set_body('Down notification for %s at %s.' % (config['url'], datetime.datetime.now()))
+            message.set_recipient_emails(config['recipient_emails'])
+            message.set_recipient_keys(config['recipient_keys'])
             message.queue_for_sending()
       
         # Send e-mail if the site just came back up
@@ -193,6 +197,8 @@ try:
             message = gpgmailmessage.GpgMailMessage()
             message.set_subject(config['subject'])
             message.set_body('Up notification for %s at %s.' % (config['url'], datetime.datetime.now()))
+            message.set_recipient_emails(config['recipient_emails'])
+            message.set_recipient_keys(config['recipient_keys'])
             message.queue_for_sending()
         prior_status = current_status
 

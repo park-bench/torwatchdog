@@ -6,3 +6,4 @@ debian/torwatchdog/*
 src/etc/opt/torwatchdog/torwatchdog.conf
 src/var/opt/log/torwatchdog.log
 *.pyc
+.idea/
