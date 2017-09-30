@@ -153,6 +153,7 @@ tor_process = stem.process.launch_tor_with_config(
 # Quit when SIGTERM is received
 # TODO: Delete the cache directory on exit
 def sig_term_handler(signal, stack_frame):
+    logger.info("SIGTERM received. Quitting.")
     logger.info("Stopping tor.")
     tor_process.kill()
     sys.exit(0)
@@ -196,8 +197,9 @@ try:
             message.queue_for_sending()
         prior_status = current_status
 
-except Exception,e:
+except Exception as exception:
+    logger.critical("Fatal %s: %s\n%s" % (type(exception).__name__, exception.message,
+        traceback.format_exc()))
     logger.info("Stopping tor.")
-    logger.trace(traceback.format_exc())
     tor_process.kill()
     sys.exit(1)
