@@ -1,4 +1,4 @@
-torwatchdog (0.2) UNRELEASED; urgency=low
+torwatchdog (0.2) stable; urgency=low
 
   * Updated for new gpgmailer interface.
   * Updated for new confighelper release.

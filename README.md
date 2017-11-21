@@ -41,3 +41,7 @@ _torwatchdog_ depends on two other pieces of the Parkbench project, which must b
 ## Updates
 
 Updates may change configuration file options, so if you have a configuration file already, check that it has all of the required options in the current example file.
+
+## Known Errors and Limitations
+
+* If no Internet is available while daemonizing, the program will eventually fail to start.
