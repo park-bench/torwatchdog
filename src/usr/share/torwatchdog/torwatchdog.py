@@ -1,6 +1,6 @@
 #!/usr/bin/env python2
 
-# Copyright 2015-2016 Joel Allen Luellwitz and Andrew Klapp
+# Copyright 2015-2017 Joel Allen Luellwitz and Andrew Klapp
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -31,32 +31,36 @@ import time
 import traceback
 import urllib
 
-pid_file = '/run/torwatchdog.pid'
+PID_FILE = '/run/torwatchdog.pid'
 
-# TODO: Check for network/internet connection if it's down
+# TODO: Eventually check to see if the network/internet connection is down.
+
 
 def daemonize():
+
     # Fork the first time to make init our parent.
     try:
         pid = os.fork()
         if pid > 0:
             sys.exit(0)
-    except OSError, e:
-        sys.stderr.write("Failed to make parent process init: %d (%s)" % (e.errno, e.strerror))
+    except OSError as e:
+        sys.stderr.write('Failed to make parent process init: %d (%s)' %
+                         (e.errno, e.strerror))
         sys.exit(1)
 
-    os.chdir("/")  # Change the working directory
+    os.chdir('/')  # Change the working directory.
     os.setsid()  # Create a new process session.
     os.umask(0)
 
-    # Fork the second time to make sure the process is not a session leader. 
+    # Fork the second time to make sure the process is not a session leader.
     #   This apparently prevents us from taking control of a TTY.
     try:
         pid = os.fork()
         if pid > 0:
             sys.exit(0)
-    except OSError, e:
-        sys.stderr.write("Failed to give up session leadership: %d (%s)" % (e.errno, e.strerror))
+    except OSError as e:
+        sys.stderr.write('Failed to give up session leadership: %d (%s)' %
+                         (e.errno, e.strerror))
         sys.exit(1)
 
     # Redirect standard file descriptors
@@ -69,10 +73,10 @@ def daemonize():
     os.close(devnull)
 
     pid = str(os.getpid())
-    pidFile = file(pid_file,'w')
-    pidFile.write("%s\n" % pid)
+    pidFile = file(PID_FILE, 'w')
+    pidFile.write('%s\n' % pid)
     pidFile.close()
-    
+
 
 config_file = ConfigParser.SafeConfigParser()
 config_file.read('/etc/torwatchdog/torwatchdog.conf')
@@ -103,14 +107,15 @@ if not os.path.exists(config['cache_dir']):
     logger.info('Creating Tor cache directory.')
     os.makedirs(config['cache_dir'])
 
-prior_status = True # Start the program assuming the website is up.
+prior_status = True  # Start the program assuming the website is up.
 
 # Set socks proxy and wrap the urllib module
 socks.setdefaultproxy(socks.PROXY_TYPE_SOCKS5, '127.0.0.1', int(config['socks_port']))
 socket.socket = socks.socksocket
 
-# Perform DNS resolution through the socket
+
 def getaddrinfo(*args):
+    """Perform DNS resolution through the socket."""
     return [(socket.AF_INET, socket.SOCK_STREAM, 6, '', (args[0], args[1]))]
 
 socket.getaddrinfo = getaddrinfo
@@ -119,42 +124,44 @@ socket.getaddrinfo = getaddrinfo
 def is_site_up(url):
     # Uses urllib to fetch a site using SocksiPy for Tor over the SOCKS_PORT.
 
-    logger.debug("Checking our endpoint: ")
+    logger.debug('Checking our endpoint: ')
     try:
         urllib.urlopen(url).read()
-        logger.debug("%s is up." % url)
+        logger.debug('%s is up.' % url)
         return True
-    except Exception as detail:
-        logger.warn("Unable to reach %s." % url)
+    except Exception:
+        logger.warn('Unable to reach %s.' % url)
         # The current version of socksipy contains a bug that causes this
         #   message to raise the wrong kind of exception and print an unhelpful
         #   message. It has been fixed in Ubuntu 16.04.
-        logger.trace("Exception: %s" % traceback.format_exc())
+        logger.trace('Exception: %s' % traceback.format_exc())
         return False
 
-# Start an instance of Tor. This prints
-# Tor's bootstrap information as it starts. Note that this will not
-# work if you have another Tor instance running.
-# TODO: Make it deal with another instance of Tor properly.
-def print_bootstrap_lines(line):
-    if "Bootstrapped " in line:
-        logger.info("%s" % line);
 
-logger.info("Starting Tor on port %s." % config['socks_port'])
+# TODO: Make this deal with another instance of Tor properly.
+def print_bootstrap_lines(line):
+    """Start an instance of Tor. This prints Tor's bootstrap information as it starts. Note
+    that this will not work if you have another Tor instance running.
+    """
+    if 'Bootstrapped ' in line:
+        logger.info('%s' % line)
+
+logger.info('Starting Tor on port %s.' % config['socks_port'])
 
 tor_process = stem.process.launch_tor_with_config(
-    config = {
+    config={
         'SocksPort': str(config['socks_port']),
         'DataDirectory': config['cache_dir'],
     },
-    init_msg_handler = print_bootstrap_lines,
+    init_msg_handler=print_bootstrap_lines,
 )
 
-# Quit when SIGTERM is received
-# TODO: Delete the cache directory on exit
+
+# TODO: Delete the cache directory on exit.
 def sig_term_handler(signal, stack_frame):
-    logger.info("SIGTERM received. Quitting.")
-    logger.info("Stopping tor.")
+    """Quit when SIGTERM is received."""
+    logger.info('SIGTERM received. Quitting.')
+    logger.info('Stopping tor.')
     tor_process.kill()
     sys.exit(0)
 
@@ -162,9 +169,9 @@ signal.signal(signal.SIGTERM, sig_term_handler)
 
 daemonize()
 try:
- 
-    # Init the secure random number generator
-    randomGenerator = random.SystemRandom()  # Uses /dev/urandom
+
+    # Init the secure random number generator.
+    randomGenerator = random.SystemRandom()  # Uses /dev/urandom.
     logger.trace('Starting loop.')
 
     while(True):
@@ -174,32 +181,34 @@ try:
         time.sleep(random.uniform(0, int(config['avg_delay'])))
 
         logger.trace('Start checking url')
-    
+
         current_status = is_site_up(config['url'])
         logger.trace('Done checking url.')
 
-        # Send e-mail if the site just went down
-        if (not current_status and prior_status):
-            logger.warn("Send down notification")
+        # Send e-mail if the site just went down.
+        if not current_status and prior_status:
+            logger.warn('Send down notification.')
 
             message = gpgmailmessage.GpgMailMessage()
             message.set_subject(config['subject'])
-            message.set_body('Down notification for %s at %s.' % (config['url'], datetime.datetime.now()))
+            message.set_body('Down notification for %s at %s.' % (config['url'],
+                             datetime.datetime.now()))
             message.queue_for_sending()
-      
-        # Send e-mail if the site just came back up
-        if (current_status and not prior_status):
-            logger.info("Send up notification")
+
+        # Send e-mail if the site just came back up.
+        if current_status and not prior_status:
+            logger.info('Send up notification')
 
             message = gpgmailmessage.GpgMailMessage()
             message.set_subject(config['subject'])
-            message.set_body('Up notification for %s at %s.' % (config['url'], datetime.datetime.now()))
+            message.set_body('Up notification for %s at %s.' % (config['url'],
+                             datetime.datetime.now()))
             message.queue_for_sending()
         prior_status = current_status
 
 except Exception as exception:
-    logger.critical("Fatal %s: %s\n%s" % (type(exception).__name__, exception.message,
-        traceback.format_exc()))
-    logger.info("Stopping tor.")
+    logger.critical('Fatal %s: %s\n%s' % (type(exception).__name__, exception.message,
+                    traceback.format_exc()))
+    logger.info('Stopping tor.')
     tor_process.kill()
     sys.exit(1)

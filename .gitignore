@@ -1,5 +1,6 @@
-debian/tmp
+debian/debhelper-build-stamp
 debian/files
+debian/tmp
 debian/torwatchdog.debhelper.log
 debian/torwatchdog.substvars
 debian/torwatchdog/*
