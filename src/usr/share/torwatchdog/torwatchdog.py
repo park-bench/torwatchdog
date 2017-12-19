@@ -187,7 +187,7 @@ try:
             message = gpgmailmessage.GpgMailMessage()
             message.set_subject(config['subject'])
             message.set_body('Down notification for %s at %s.' % (config['url'], datetime.datetime.now()))
-            message.set_recipient_emails(config['recipient_emails'])
+            message.set_recipients(config['recipient_emails'])
             message.set_recipient_keys(config['recipient_keys'])
             message.queue_for_sending()
       
@@ -198,7 +198,7 @@ try:
             message = gpgmailmessage.GpgMailMessage()
             message.set_subject(config['subject'])
             message.set_body('Up notification for %s at %s.' % (config['url'], datetime.datetime.now()))
-            message.set_recipient_emails(config['recipient_emails'])
+            message.set_recipients(config['recipient_emails'])
             message.set_recipient_keys(config['recipient_keys'])
             message.queue_for_sending()
         prior_status = current_status
