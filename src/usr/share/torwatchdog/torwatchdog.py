@@ -47,9 +47,8 @@ def daemonize():
         if pid > 0:
             sys.exit(0)
     except OSError as e:
-        sys.stderr.write('Failed to make parent process init: %d (%s)' %
-                         (e.errno, e.strerror))
-        sys.exit(1)
+        raise Exception('Failed to make parent process init: %d (%s)' % (
+            e.errno, e.strerror))
 
     os.chdir('/')  # Change the working directory.
     os.setsid()  # Create a new process session.
@@ -62,9 +61,8 @@ def daemonize():
         if pid > 0:
             sys.exit(0)
     except OSError as e:
-        sys.stderr.write('Failed to give up session leadership: %d (%s)' %
-                         (e.errno, e.strerror))
-        sys.exit(1)
+        raise Exception('Failed to give up session leadership: %d (%s)' % (
+            e.errno, e.strerror))
 
     # Redirect standard file descriptors
     sys.stdout.flush()
@@ -214,4 +212,4 @@ except Exception as exception:
                     traceback.format_exc()))
     logger.info('Stopping tor.')
     tor_process.kill()
-    sys.exit(1)
+    raise exception
