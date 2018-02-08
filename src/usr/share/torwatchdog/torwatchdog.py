@@ -15,12 +15,16 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-# Verifies a website is running over Tor and sends an encrypted e-mail
-#   notification when the site's availability changes. Uses urllib to
-#   fetch the site using SocksiPy for Tor over the SOCKS_PORT.
+"""Verifies a website is running over Tor and sends an encrypted e-mail notification when
+the site's availability changes.  Uses urllib to fetch the site using SocksiPy for Tor over
+the SOCKS_PORT.
+"""
 
-# TODO: Consider running in a chroot or jail.
-# TODO: Check if network/internet connection is down
+# TODO: Eventually consider running in a chroot or jail.
+# TODO: Eventually check to see if the network/internet connection is down.
+
+__author__ = 'Joel Luellwitz and Andrew Klapp'
+__version__ = '0.8'
 
 import confighelper
 import ConfigParser
@@ -48,45 +52,47 @@ import traceback
 import urllib
 
 # Constants
-program_name = 'torwatchdog'
-configuration_pathname = os.path.join('/etc', program_name, '%s.conf' % program_name)
-system_pid_dir = '/run'
-program_pid_dirs = program_name
-pid_file = '%s.pid' % program_name
-log_dir = os.path.join('/var/log', program_name)
-log_file = '%s.log' % program_name
-system_data_dir = '/var/cache'
-tor_data_dirs = os.path.join(program_name, 'tor')
-process_username = program_name
-process_group_name = program_name
+PROGRAM_NAME = 'torwatchdog'
+CONFIGURATION_PATHNAME = os.path.join('/etc', PROGRAM_NAME, '%s.conf' % PROGRAM_NAME)
+SYSTEM_PID_DIR = '/run'
+PROGRAM_PID_DIRS = PROGRAM_NAME
+PID_FILE = '%s.pid' % PROGRAM_NAME
+LOG_DIR = os.path.join('/var/log', PROGRAM_NAME)
+LOG_FILE = '%s.log' % PROGRAM_NAME
+SYSTEM_DATA_DIR = '/var/cache'
+TOR_DATA_DIRS = os.path.join(PROGRAM_NAME, 'tor')
+PROCESS_USERNAME = PROGRAM_NAME
+PROCESS_GROUP_NAME = PROGRAM_NAME
 
 
-# Get user and group information for dropping privileges.
-#
-# Returns the user and group IDs that the program should eventually run as.
 def get_user_and_group_ids():
+    """Get user and group information for dropping privileges.
+
+    Returns the user and group IDs that the program should eventually run as.
+    """
     try:
-        program_user = pwd.getpwnam(process_username)
+        program_user = pwd.getpwnam(PROCESS_USERNAME)
     except KeyError as key_error:
-        raise Exception('User %s does not exist.' % process_username, key_error)
+        raise Exception('User %s does not exist.' % PROCESS_USERNAME, key_error)
     try:
-        program_group = grp.getgrnam(process_group_name)
+        program_group = grp.getgrnam(PROCESS_GROUP_NAME)
     except KeyError as key_error:
-        raise Exception('Group %s does not exist.' % process_group_name, key_error)
+        raise Exception('Group %s does not exist.' % PROCESS_GROUP_NAME, key_error)
 
-    return (program_user.pw_uid, program_group.gr_gid)
+    return program_user.pw_uid, program_group.gr_gid
 
 
-# Reads the configuration file and creates the application logger. This is done in the
-#   same function because part of the logger creation is dependent upon reading the
-#   configuration file.
-#
-# program_uid: The system user ID this program should drop to before daemonization.
-# program_gid: The system group ID this program should drop to before daemonization.
-# Returns the read system config, a confighelper instance, and a logger instance.
 def read_configuration_and_create_logger(program_uid, program_gid):
+    """Reads the configuration file and creates the application logger. This is done in the
+    same function because part of the logger creation is dependent upon reading the
+    configuration file.
+
+    program_uid: The system user ID this program should drop to before daemonization.
+    program_gid: The system group ID this program should drop to before daemonization.
+    Returns the read system config, a confighelper instance, and a logger instance.
+    """
     config_parser = ConfigParser.SafeConfigParser()
-    config_parser.read(configuration_pathname)
+    config_parser.read(CONFIGURATION_PATHNAME)
 
     # Logging config goes first
     config = {}
@@ -94,47 +100,51 @@ def read_configuration_and_create_logger(program_uid, program_gid):
     config['log_level'] = config_helper.verify_string_exists(config_parser, 'log_level')
 
     # Create logging directory.
-    log_mode = stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH
-    # TODO: Look into defaulting the logging to the console until the program gets more bootstrapped.
-    print('Creating logging directory %s.' % log_dir)
-    if not os.path.isdir(log_dir):
+    log_mode = stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IRGRP | stat.S_IXGRP | \
+        stat.S_IROTH | stat.S_IXOTH
+    # TODO: Look into defaulting the logging to the console until the program gets more
+    #   bootstrapped.
+    print('Creating logging directory %s.' % LOG_DIR)
+    if not os.path.isdir(LOG_DIR):
         # Will throw exception if file cannot be created.
-        os.makedirs(log_dir, log_mode)
-    os.chown(log_dir, program_uid, program_gid)
-    os.chmod(log_dir, log_mode)
+        os.makedirs(LOG_DIR, log_mode)
+    os.chown(LOG_DIR, program_uid, program_gid)
+    os.chmod(LOG_DIR, log_mode)
 
     # Temporarily drop permission and create the handle to the logger.
     os.setegid(program_gid)
     os.seteuid(program_uid)
-    config_helper.configure_logger(os.path.join(log_dir, log_file), config['log_level'])
+    config_helper.configure_logger(os.path.join(LOG_DIR, LOG_FILE), config['log_level'])
     os.seteuid(os.getuid())
     os.setegid(os.getgid())
 
-    logger = logging.getLogger('%s-daemon' % program_name)
+    logger = logging.getLogger('%s-daemon' % PROGRAM_NAME)
 
     logger.info('Verifying non-logging config')
     config['url'] = config_helper.verify_string_exists(config_parser, 'url')
-    config['tor_socks_port'] = \
-        config_helper.verify_integer_exists(config_parser, 'tor_socks_port')
-    config['average_delay'] = \
-        config_helper.verify_number_exists(config_parser, 'average_delay')
-    config['email_subject'] = \
-        config_helper.verify_string_exists(config_parser, 'email_subject')
+    config['tor_socks_port'] = config_helper.verify_integer_exists(
+        config_parser, 'tor_socks_port')
+    config['average_delay'] = config_helper.verify_number_exists(
+        config_parser, 'average_delay')
+    config['email_subject'] = config_helper.verify_string_exists(
+        config_parser, 'email_subject')
 
     return (config, config_helper, logger)
 
 
-# Creates directories if they do not exist and sets the specified ownership and permissions.
-#
-# system_path: The system path that the directories should be created under. These are assumed to
-#   already exist. The ownership and permissions on these directories are not modified.
-# program_dirs: A string representing additional directories that should be created under the system
-#   path that should take on the following ownership and permissions.
-# uid: The system user ID that should own the directory.
-# gid: The system group ID that should own be associated with the directory.
-# mode: The umask of the directory access permissions.
 def create_directory(system_path, program_dirs, uid, gid, mode):
+    """Creates directories if they do not exist and sets the specified ownership and
+    permissions.
 
+    system_path: The system path that the directories should be created under. These are
+      assumed to already exist. The ownership and permissions on these directories are not
+      modified.
+    program_dirs: A string representing additional directories that should be created under
+      the system path that should take on the following ownership and permissions.
+    uid: The system user ID that should own the directory.
+    gid: The system group ID that should own be associated with the directory.
+    mode: The umask of the directory access permissions.
+    """
     logger.info('Creating directory %s.' % os.path.join(system_path, program_dirs))
 
     path = system_path
@@ -147,39 +157,43 @@ def create_directory(system_path, program_dirs, uid, gid, mode):
         os.chmod(path, mode)
 
 
-# Drops escalated permissions forever to the specified user and group.
-#
-# uid: The system user ID to drop to.
-# gid: The system group ID to drop to.
 def drop_permissions_forever(uid, gid):
-    logger.info('Dropping permissions for user %s.' % process_username)
-    os.initgroups(process_username, gid)
+    """Drops escalated permissions forever to the specified user and group.
+
+    uid: The system user ID to drop to.
+    gid: The system group ID to drop to.
+    """
+    logger.info('Dropping permissions for user %s.' % PROCESS_USERNAME)
+    os.initgroups(PROCESS_USERNAME, gid)
     os.setgid(gid)
     os.setuid(uid)
 
 
-# Configures the tor proxy settings.
-#
-# config: The program configuration object, mostly based on the configuration file.
 def configure_tor_proxy(config):
+    """Configures the tor proxy settings.
+
+    config: The program configuration object, mostly based on the configuration file.
+    """
     # Set socks proxy and wrap the urllib module
-    # TODO: Consider choosing a randomly available TCP port.
-    socks.setdefaultproxy(socks.PROXY_TYPE_SOCKS5, '127.0.0.1', int(config['tor_socks_port']))
+    # TODO: Eventually consider choosing a randomly available TCP port.
+    socks.setdefaultproxy(
+        socks.PROXY_TYPE_SOCKS5, '127.0.0.1', int(config['tor_socks_port']))
     socket.socket = socks.socksocket
-    socket.getaddrinfo = lambda *args : [(socket.AF_INET, socket.SOCK_STREAM, 6, '', (args[0], args[1]))]
+    socket.getaddrinfo = lambda *args: [(
+        socket.AF_INET, socket.SOCK_STREAM, 6, '', (args[0], args[1]))]
 
 
-# Creates the daemon context. Specifies daemon permissions, PID file information, and
-#   signal handler.
-#
-# log_file_handle: The file handle to the log file.
-# Returns the daemon context.
 def setup_daemon_context(log_file_handle, program_uid, program_gid):
+    """Creates the daemon context. Specifies daemon permissions, PID file information, and
+    signal handler.
 
+    log_file_handle: The file handle to the log file.
+    Returns the daemon context.
+    """
     daemon_context = daemon.DaemonContext(
         working_directory='/',
         pidfile=pidlockfile.PIDLockFile(
-            os.path.join(system_pid_dir, program_pid_dirs, pid_file)),
+            os.path.join(SYSTEM_PID_DIR, PROGRAM_PID_DIRS, PID_FILE)),
         umask=0o117,  # Read/write by user and group.
         )
 
@@ -196,14 +210,19 @@ def setup_daemon_context(log_file_handle, program_uid, program_gid):
     return daemon_context
 
 
-# Starts the tor process prior to daemonization. If the tor process fails too quickly, we assume tor
-#   is configured incorrectly and the program quits. Else, the program will keep trying to connect to
-#   tor.
-#
-# config: The program configuration object, mostly based on the configuration file.
-# Returns a handle to the tor process.
-def start_tor_before_daemonize(config):
+def getaddrinfo(*args):
+    """Perform DNS resolution through the socket."""
+    return [(socket.AF_INET, socket.SOCK_STREAM, 6, '', (args[0], args[1]))]
 
+
+def start_tor_before_daemonize(config):
+    """Starts the tor process prior to daemonization. If the tor process fails too quickly,
+    we assume tor is configured incorrectly and the program quits. Else, the program will
+    keep trying to connect to tor.
+
+    config: The program configuration object, mostly based on the configuration file.
+    Returns a handle to the tor process.
+    """
     tor_process = None
     start_time = datetime.datetime.now()
     try:
@@ -214,64 +233,78 @@ def start_tor_before_daemonize(config):
 
         # If tor quit in less than 30 seconds, assume something is misconfigured.
         if fail_time < datetime.timedelta(seconds=30):
-            raise RuntimeError('Tor failed to start in only %d seconds. Assuming the program is ' +
+            raise RuntimeError(
+                'Tor failed to start in only %d seconds. Assuming the program is '
                 'misconfigured. Quitting.' % fail_time, os_error)
 
     return tor_process
 
 
-# Starts the tor process.
-#
-# config: The program configuration object, mostly based on the configuration file.
-# Returns a handle to the tor process.
 def start_tor(config):
+    """Starts the tor process.
 
+    config: The program configuration object, mostly based on the configuration file.
+    Returns a handle to the tor process.
+    """
     # Note that the 'take_ownership' option does not work correctly after forking.
     tor_config = {
         'SocksPort': str(config['tor_socks_port']),
-        'DataDirectory': os.path.join(system_data_dir, tor_data_dirs),
+        'DataDirectory': os.path.join(SYSTEM_DATA_DIR, TOR_DATA_DIRS),
     }
-     
+
     logger.info('Starting Tor on port %s.' % config['tor_socks_port'])
-    tor_process = stem.process.launch_tor_with_config(tor_config,
-        init_msg_handler=print_bootstrap_lines)
+    tor_process = stem.process.launch_tor_with_config(
+        tor_config, init_msg_handler=print_bootstrap_lines)
 
     return tor_process
 
 
-# Callback to log only Tor's bootstrap lines.
-#
-# line: A Tor log line.
 def print_bootstrap_lines(line):
+    """Callback to log only Tor's bootstrap lines.
+
+    line: A Tor log line.
+    """
     if 'Bootstrapped ' in line:
         logger.info('%s' % line)
 
 
-# The main program loop.
-#
-# config: The program configuration object, mostly based on the configuration file.
-# tor_process: A handle to the tor process.
-def main_loop(config, tor_process):
+def sig_term_handler(signal, stack_frame):
+    """Signal handler for SIGTERM. Kills Tor and quits when SIGTERM is received.
 
+    signal: Object representing the signal thrown.
+    stack_frame: Represents the stack frame.
+    """
+    logger.info('SIGTERM received. Quitting.')
+    if tor_process is not None:
+        logger.info('Stopping tor.')
+        tor_process.kill()
+    sys.exit(0)
+
+
+def main_loop(config, tor_process):
+    """The main program loop.
+
+    config: The program configuration object, mostly based on the configuration file.
+    tor_process: A handle to the tor process.
+    """
     # If tor hasn't started, keep trying.
     while tor_process is None:
         try:
             tor_process = start_tor(config)
         except Exception as exception:
-            logger.error('Failed to start tor: %s: %s' % (type(exception).__name__, 
-                exception.message))
+            logger.error('Failed to start tor: %s: %s' % (
+                type(exception).__name__, exception.message))
             logger.error(traceback.format_exc())
             logger.error('Will try to connect again in 1 second.')
             time.sleep(1)
 
-    random.SystemRandom()  # Uses /dev/urandom, for determining how long to sleep the main loop.
+    # Uses /dev/urandom, for determining how long to sleep the main loop.
+    random.SystemRandom()
 
     prior_status = True  # Start the program assuming the website is up.
-    
-    logger.trace('Starting loop.')
 
+    logger.trace('Starting loop.')
     while(True):
-        
         # Let's not be too obvious about what this program does. Ramdomize the time between
         #   status checks.
         sleep_seconds = random.uniform(0, int(config['average_delay']))
@@ -282,25 +315,28 @@ def main_loop(config, tor_process):
 
         # Send e-mail if the site just went down
         if (not current_status and prior_status):
-            message = 'Down notification for %s at %s.' % (config['url'], datetime.datetime.now())
+            message = 'Down notification for %s at %s.' % (
+                config['url'], datetime.datetime.now())
             email_error_message = 'Could not send down notification.'
             log_and_send_message(config, message, email_error_message)
-      
+
         # Send e-mail if the site just came back up
         if (current_status and not prior_status):
-            message = 'Up notification for %s at %s.' % (config['url'], datetime.datetime.now())
+            message = 'Up notification for %s at %s.' % (
+                config['url'], datetime.datetime.now())
             email_error_message = 'Could not send up notification.'
             log_and_send_message(config, message, email_error_message)
 
         prior_status = current_status
 
 
-# Logs and sends an e-mail of a message.
-#
-# config: The program configuration object, mostly based on the configuration file.
-# message: The message.
-# email_error_message: A message to log in the event of an error while sending the e-mail.
 def log_and_send_message(config, message, email_error_message):
+    """Logs and sends an e-mail of a message.
+
+    config: The program configuration object, mostly based on the configuration file.
+    message: The e-mail message body.
+    email_error_message: A message to log in the event of an error while sending the e-mail.
+    """
     logger.warn(message)
 
     try:
@@ -309,76 +345,66 @@ def log_and_send_message(config, message, email_error_message):
         mail_message.set_body(message)
         mail_message.queue_for_sending()
     except Exception as detail:
-        logger.error('%s %s: %s', email_error_message, (type(detail).__name__, detail.message))
+        logger.error('%s %s: %s', email_error_message, (
+            type(detail).__name__, detail.message))
         logger.error(traceback.format_exc())
 
 
-# Checks if the specified website is available over Tor.
-#
-# url: The website to check for availability.
 def is_site_up(url):
+    """Checks if the specified website is available over Tor.
 
+    url: The website to check for availability.
+    """
     logger.debug('Checking url %s.' % url)
 
     try:
         urllib.urlopen(url).read()
         logger.debug('%s is up.' % url)
         return True
-    except Exception as detail:
-        logger.warn('Unable to reach %s. %s: %s' % (url, type(detail).__name__, detail.message))
-        logger.debug('Full reason for lookup failure: %s' % traceback.format_exc())
+    except Exception:
+        logger.warn('Unable to reach %s.' % url)
+        # The current version of socksipy contains a bug that causes this
+        #   message to raise the wrong kind of exception and print an unhelpful
+        #   message. It has been fixed in Ubuntu 16.04.
+        logger.trace('Exception: %s' % traceback.format_exc())
         return False
-        
-    logger.trace('Done checking url %s.' % url)
-
-
-# Signal handler for SIGTERM. Kills Tor and quits when SIGTERM is received.
-#
-# signal: Object representing the signal thrown.
-# stack_frame: Represents the stack frame.
-def sig_term_handler(signal, stack_frame):
-    logger.info("Received SIGTERM, quitting.")
-    if tor_process != None:
-        logger.info('Stopping tor.')
-        tor_process.kill()
-    sys.exit(0)
 
 
 program_uid, program_gid = get_user_and_group_ids()
 
-config, config_helper, logger = read_configuration_and_create_logger(program_uid, program_gid)
+config, config_helper, logger = read_configuration_and_create_logger(
+    program_uid, program_gid)
 
 tor_process = None
 try:
-    # Read gpgmailer watch directory from the gpgmailer config file
-    gpgmailmessage.GpgMailMessage.configure()
-
-    # Non-root users cannot create files in /run, so create a directory that can be written to.
-    #   Full access to user only.
-    create_directory(system_pid_dir, program_pid_dirs, program_uid, program_gid,
+    # Non-root users cannot create files in /run, so create a directory that can be written
+    #   to. Full access to user only.
+    create_directory(
+        SYSTEM_PID_DIR, PROGRAM_PID_DIRS, program_uid, program_gid,
         stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
 
-    # Make the Tor data directory.
-    #   Full access to user only.
-    create_directory(system_data_dir, tor_data_dirs, program_uid, program_gid,
+    # Make the Tor data directory. Full access to user only.
+    create_directory(
+        SYSTEM_DATA_DIR, TOR_DATA_DIRS, program_uid, program_gid,
         stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
-     
+
     # Configuration has been read and directories setup. Now drop permissions forever.
     drop_permissions_forever(program_uid, program_gid)
 
     configure_tor_proxy(config)
 
-    daemon_context = setup_daemon_context(config_helper.get_log_file_handle(), program_uid, program_gid)
+    daemon_context = setup_daemon_context(
+        config_helper.get_log_file_handle(), program_uid, program_gid)
 
     tor_process = start_tor_before_daemonize(config)
 
     with daemon_context:
         main_loop(config, tor_process)
- 
-except Exception as e:
-    logger.critical('Fatal %s: %s\n' % (type(e).__name__, e.message))
-    logger.critical(traceback.format_exc())
-    if tor_process != None:
+
+except Exception as exception:
+    logger.critical('Fatal %s: %s\n%s' % (type(exception).__name__, exception.message,
+                    traceback.format_exc()))
+    if tor_process is not None:
         logger.info('Stopping tor.')
         tor_process.kill()
-    sys.exit(1)
+    raise exception

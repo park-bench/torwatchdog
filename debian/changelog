@@ -1,4 +1,10 @@
-torwatchdog (0.2) UNRELEASED; urgency=low
+torwatchdog (0.8) UNRELEASED; urgency=medium
+
+  * Bumped version number to match compatible libraries in project.
+
+ -- Andrew Klapp <andklapp@null.net>  Mon, 27 Nov 2017 20:35:52 -0600
+
+torwatchdog (0.2) stable; urgency=low
 
   [ Andrew Klapp ]
   * Updated for new gpgmailer interface.
