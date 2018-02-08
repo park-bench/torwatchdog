@@ -1,6 +1,6 @@
 #!/usr/bin/env python2
 
-# Copyright 2015-2016 Joel Allen Luellwitz and Andrew Klapp
+# Copyright 2015-2018 Joel Allen Luellwitz and Andrew Klapp
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -91,7 +91,7 @@ def read_configuration_and_create_logger(program_uid, program_gid):
     # Logging config goes first
     config = {}
     config_helper = confighelper.ConfigHelper()
-    config['log_level'] = config_helper.verify_string_exists_prelogging(config_parser, 'log_level')
+    config['log_level'] = config_helper.verify_string_exists(config_parser, 'log_level')
 
     # Create logging directory.
     log_mode = stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH
@@ -137,8 +137,9 @@ def create_directory(system_path, program_dirs, uid, gid, mode):
 
     logger.info('Creating directory %s.' % os.path.join(system_path, program_dirs))
 
+    path = system_path
     for directory in program_dirs.strip('/').split('/'):
-        path = os.path.join(system_path, directory)
+        path = os.path.join(path, directory)
         if not os.path.isdir(path):
             # Will throw exception if file cannot be created.
             os.makedirs(path, mode)
@@ -176,13 +177,14 @@ def configure_tor_proxy(config):
 def setup_daemon_context(log_file_handle, program_uid, program_gid):
 
     daemon_context = daemon.DaemonContext(
-        working_directory = '/',
-        pidfile = pidlockfile.PIDLockFile(os.path.join(system_pid_dir, program_pid_dirs, pid_file)),
-        umask = 0o117,  # Read/write by user and group.
+        working_directory='/',
+        pidfile=pidlockfile.PIDLockFile(
+            os.path.join(system_pid_dir, program_pid_dirs, pid_file)),
+        umask=0o117,  # Read/write by user and group.
         )
 
     daemon_context.signal_map = {
-        signal.SIGTERM : sig_term_handler,
+        signal.SIGTERM: sig_term_handler,
         }
 
     daemon_context.files_preserve = [log_file_handle]
@@ -232,7 +234,7 @@ def start_tor(config):
      
     logger.info('Starting Tor on port %s.' % config['tor_socks_port'])
     tor_process = stem.process.launch_tor_with_config(tor_config,
-        init_msg_handler = print_bootstrap_lines)
+        init_msg_handler=print_bootstrap_lines)
 
     return tor_process
 
