@@ -202,6 +202,8 @@ def setup_daemon_context(log_file_handle, program_uid, program_gid):
     signal handler.
 
     log_file_handle: The file handle to the log file.
+    uid: The system user ID the daemon should run as.
+    gid: The system group ID the daemon should run as.
     Returns the daemon context.
     """
     daemon_context = daemon.DaemonContext(
@@ -288,8 +290,9 @@ def is_site_up(url):
         urllib.urlopen(url).read()
         logger.debug('%s is up.' % url)
         return True
-    except Exception:
-        logger.warn('Unable to reach %s.' % url)
+    except Exception as exception:
+        logger.warn('Unable to reach %s. %s: %s' % (
+            url, type(exception).__name__, exception.message))
         # The current version of socksipy contains a bug that causes this
         #   message to raise the wrong kind of exception and print an unhelpful
         #   message. It has been fixed in Ubuntu 16.04.
