@@ -179,8 +179,22 @@ def configure_tor_proxy(config):
     socks.setdefaultproxy(
         socks.PROXY_TYPE_SOCKS5, '127.0.0.1', int(config['tor_socks_port']))
     socket.socket = socks.socksocket
+    # Perform DNS resolution through the socket.
     socket.getaddrinfo = lambda *args: [(
         socket.AF_INET, socket.SOCK_STREAM, 6, '', (args[0], args[1]))]
+
+
+def sig_term_handler(signal, stack_frame):
+    """Signal handler for SIGTERM. Kills Tor and quits when SIGTERM is received.
+
+    signal: Object representing the signal thrown.
+    stack_frame: Represents the stack frame.
+    """
+    logger.info('SIGTERM received. Quitting.')
+    if tor_process is not None:
+        logger.info('Stopping tor.')
+        tor_process.kill()
+    sys.exit(0)
 
 
 def setup_daemon_context(log_file_handle, program_uid, program_gid):
@@ -210,9 +224,32 @@ def setup_daemon_context(log_file_handle, program_uid, program_gid):
     return daemon_context
 
 
-def getaddrinfo(*args):
-    """Perform DNS resolution through the socket."""
-    return [(socket.AF_INET, socket.SOCK_STREAM, 6, '', (args[0], args[1]))]
+def print_bootstrap_lines(line):
+    """Callback to log only Tor's bootstrap lines.
+
+    line: A Tor log line.
+    """
+    if 'Bootstrapped ' in line:
+        logger.info('%s' % line)
+
+
+def start_tor(config):
+    """Starts the tor process.
+
+    config: The program configuration object, mostly based on the configuration file.
+    Returns a handle to the tor process.
+    """
+    # Note that the 'take_ownership' option does not work correctly after forking.
+    tor_config = {
+        'SocksPort': str(config['tor_socks_port']),
+        'DataDirectory': os.path.join(SYSTEM_DATA_DIR, TOR_DATA_DIRS),
+    }
+
+    logger.info('Starting Tor on port %s.' % config['tor_socks_port'])
+    tor_process = stem.process.launch_tor_with_config(
+        tor_config, init_msg_handler=print_bootstrap_lines)
+
+    return tor_process
 
 
 def start_tor_before_daemonize(config):
@@ -240,45 +277,44 @@ def start_tor_before_daemonize(config):
     return tor_process
 
 
-def start_tor(config):
-    """Starts the tor process.
+def is_site_up(url):
+    """Checks if the specified website is available over Tor.
+
+    url: The website to check for availability.
+    """
+    logger.debug('Checking url %s.' % url)
+
+    try:
+        urllib.urlopen(url).read()
+        logger.debug('%s is up.' % url)
+        return True
+    except Exception:
+        logger.warn('Unable to reach %s.' % url)
+        # The current version of socksipy contains a bug that causes this
+        #   message to raise the wrong kind of exception and print an unhelpful
+        #   message. It has been fixed in Ubuntu 16.04.
+        logger.trace('Exception: %s' % traceback.format_exc())
+        return False
+
+
+def log_and_send_message(config, message, email_error_message):
+    """Logs and sends an e-mail of a message.
 
     config: The program configuration object, mostly based on the configuration file.
-    Returns a handle to the tor process.
+    message: The e-mail message body.
+    email_error_message: A message to log in the event of an error while sending the e-mail.
     """
-    # Note that the 'take_ownership' option does not work correctly after forking.
-    tor_config = {
-        'SocksPort': str(config['tor_socks_port']),
-        'DataDirectory': os.path.join(SYSTEM_DATA_DIR, TOR_DATA_DIRS),
-    }
+    logger.warn(message)
 
-    logger.info('Starting Tor on port %s.' % config['tor_socks_port'])
-    tor_process = stem.process.launch_tor_with_config(
-        tor_config, init_msg_handler=print_bootstrap_lines)
-
-    return tor_process
-
-
-def print_bootstrap_lines(line):
-    """Callback to log only Tor's bootstrap lines.
-
-    line: A Tor log line.
-    """
-    if 'Bootstrapped ' in line:
-        logger.info('%s' % line)
-
-
-def sig_term_handler(signal, stack_frame):
-    """Signal handler for SIGTERM. Kills Tor and quits when SIGTERM is received.
-
-    signal: Object representing the signal thrown.
-    stack_frame: Represents the stack frame.
-    """
-    logger.info('SIGTERM received. Quitting.')
-    if tor_process is not None:
-        logger.info('Stopping tor.')
-        tor_process.kill()
-    sys.exit(0)
+    try:
+        mail_message = gpgmailmessage.GpgMailMessage()
+        mail_message.set_subject(config['email_subject'])
+        mail_message.set_body(message)
+        mail_message.queue_for_sending()
+    except Exception as detail:
+        logger.error('%s %s: %s', email_error_message, (
+            type(detail).__name__, detail.message))
+        logger.error(traceback.format_exc())
 
 
 def main_loop(config, tor_process):
@@ -328,46 +364,6 @@ def main_loop(config, tor_process):
             log_and_send_message(config, message, email_error_message)
 
         prior_status = current_status
-
-
-def log_and_send_message(config, message, email_error_message):
-    """Logs and sends an e-mail of a message.
-
-    config: The program configuration object, mostly based on the configuration file.
-    message: The e-mail message body.
-    email_error_message: A message to log in the event of an error while sending the e-mail.
-    """
-    logger.warn(message)
-
-    try:
-        mail_message = gpgmailmessage.GpgMailMessage()
-        mail_message.set_subject(config['email_subject'])
-        mail_message.set_body(message)
-        mail_message.queue_for_sending()
-    except Exception as detail:
-        logger.error('%s %s: %s', email_error_message, (
-            type(detail).__name__, detail.message))
-        logger.error(traceback.format_exc())
-
-
-def is_site_up(url):
-    """Checks if the specified website is available over Tor.
-
-    url: The website to check for availability.
-    """
-    logger.debug('Checking url %s.' % url)
-
-    try:
-        urllib.urlopen(url).read()
-        logger.debug('%s is up.' % url)
-        return True
-    except Exception:
-        logger.warn('Unable to reach %s.' % url)
-        # The current version of socksipy contains a bug that causes this
-        #   message to raise the wrong kind of exception and print an unhelpful
-        #   message. It has been fixed in Ubuntu 16.04.
-        logger.trace('Exception: %s' % traceback.format_exc())
-        return False
 
 
 program_uid, program_gid = get_user_and_group_ids()
