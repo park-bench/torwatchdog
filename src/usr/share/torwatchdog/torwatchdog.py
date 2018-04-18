@@ -202,8 +202,8 @@ def setup_daemon_context(log_file_handle, program_uid, program_gid):
     signal handler.
 
     log_file_handle: The file handle to the log file.
-    uid: The system user ID the daemon should run as.
-    gid: The system group ID the daemon should run as.
+    program_uid: The system user ID the daemon should run as.
+    program_gid: The system group ID the daemon should run as.
     Returns the daemon context.
     """
     daemon_context = daemon.DaemonContext(
@@ -270,11 +270,18 @@ def start_tor_before_daemonize(config):
         end_time = datetime.datetime.now()
         fail_time = end_time - start_time
 
+        logger.error('Failed start Tor. %s: %s' % (
+            type(os_error).__name__, os_error.message))
+        logger.error(traceback.format_exc())
+
         # If tor quit in less than 30 seconds, assume something is misconfigured.
-        if fail_time < datetime.timedelta(seconds=30):
-            raise RuntimeError(
+        if fail_time >= datetime.timedelta(seconds=30):
+            logger.error('Will try again after daemonize.')
+        else:
+            # TODO: When moving to Python 3, convert to checked exception.
+            raise Exception(
                 'Tor failed to start in only %d seconds. Assuming the program is '
-                'misconfigured. Quitting.' % fail_time, os_error)
+                'misconfigured. Quitting.' % fail_time.total_seconds())
 
     return tor_process
 
@@ -331,7 +338,7 @@ def main_loop(config, tor_process):
         try:
             tor_process = start_tor(config)
         except Exception as exception:
-            logger.error('Failed to start tor: %s: %s' % (
+            logger.error('Failed to start Tor. %s: %s' % (
                 type(exception).__name__, exception.message))
             logger.error(traceback.format_exc())
             logger.error('Will try to connect again in 1 second.')
