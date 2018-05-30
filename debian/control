@@ -7,6 +7,6 @@ Standards-Version: 3.9.6.1
 
 Package: torwatchdog
 Architecture: all
-# TODO: Remove python-socksipy after we drop Ubuntu 14.04 LTS support.
+# TODO #3: Remove python-socksipy after we drop Ubuntu 14.04 LTS support.
 Depends: confighelper (>=0.3),gpgmailer (>=0.7),python-stem,python-socks | python-socksipy,tor
 Description: Daemon that checks URL resolution through Tor and sends encrypted notifications of resolution status changes.

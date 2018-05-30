@@ -36,7 +36,7 @@ import urllib
 
 PID_FILE = '/run/torwatchdog.pid'
 
-# TODO: Eventually check to see if the network/internet connection is down.
+# TODO #4: Eventually check to see if the network/internet connection is down.
 
 
 def daemonize():
@@ -139,7 +139,7 @@ def is_site_up(url):
         return False
 
 
-# TODO: Make this deal with another instance of Tor properly.
+# TODO #5: Make this deal with another instance of Tor properly.
 def print_bootstrap_lines(line):
     """Start an instance of Tor. This prints Tor's bootstrap information as it starts. Note
     that this will not work if you have another Tor instance running.
@@ -158,7 +158,7 @@ tor_process = stem.process.launch_tor_with_config(
 )
 
 
-# TODO: Delete the cache directory on exit.
+# TODO #6: Delete the cache directory on exit.
 def sig_term_handler(signal, stack_frame):
     """Quit when SIGTERM is received."""
     logger.info('SIGTERM received. Quitting.')
