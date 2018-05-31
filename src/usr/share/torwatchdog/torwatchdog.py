@@ -63,6 +63,7 @@ SYSTEM_DATA_DIR = '/var/cache'
 TOR_DATA_DIRS = os.path.join(PROGRAM_NAME, 'tor')
 PROCESS_USERNAME = PROGRAM_NAME
 PROCESS_GROUP_NAME = PROGRAM_NAME
+PROGRAM_UMASK = 0o027  # -rw-r----- and drwxr-x---
 
 
 def get_user_and_group_ids():
@@ -210,7 +211,7 @@ def setup_daemon_context(log_file_handle, program_uid, program_gid):
         working_directory='/',
         pidfile=pidlockfile.PIDLockFile(
             os.path.join(SYSTEM_PID_DIR, PROGRAM_PID_DIRS, PID_FILE)),
-        umask=0o117,  # Read/write by user and group.
+        umask=PROGRAM_UMASK,
         )
 
     daemon_context.signal_map = {
@@ -376,6 +377,7 @@ def main_loop(config, tor_process):
         prior_status = current_status
 
 
+os.umask(PROGRAM_UMASK)
 program_uid, program_gid = get_user_and_group_ids()
 
 config, config_helper, logger = read_configuration_and_create_logger(
