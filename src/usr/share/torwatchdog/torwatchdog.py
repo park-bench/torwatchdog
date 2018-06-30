@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 """Verifies a website is running over Tor and sends an encrypted e-mail notification when
-the site's availability changes.  Uses urllib to fetch the site using SocksiPy for Tor over
+the site's availability changes.  Uses urllib to fetch the site using Socks for Tor over
 the SOCKS_PORT.
 """
 
@@ -26,30 +26,26 @@ the SOCKS_PORT.
 __author__ = 'Joel Luellwitz and Andrew Klapp'
 __version__ = '0.8'
 
-import confighelper
 import ConfigParser
-import daemon
 import datetime
-import gpgmailmessage
 import grp
 import logging
 import os
-# TODO: Remove try/except when we drop support for Ubuntu 14.04 LTS.
-try:
-    from lockfile import pidlockfile
-except ImportError:
-    from daemon import pidlockfile
 import pwd
 import random
 import signal
 import socket
-import socks
 import stat
-import stem.process
 import sys
 import time
 import traceback
 import urllib
+import confighelper
+import daemon
+from lockfile import pidlockfile
+import socks
+import stem.process
+import gpgmailmessage
 
 # Constants
 PROGRAM_NAME = 'torwatchdog'
@@ -74,11 +70,15 @@ def get_user_and_group_ids():
     try:
         program_user = pwd.getpwnam(PROCESS_USERNAME)
     except KeyError as key_error:
-        raise Exception('User %s does not exist.' % PROCESS_USERNAME, key_error)
+        # TODO: When moving to Python 3, change to chained exception.
+        logger.error('User %s does not exist.', PROCESS_USERNAME)
+        raise key_error
     try:
         program_group = grp.getgrnam(PROCESS_GROUP_NAME)
     except KeyError as key_error:
-        raise Exception('Group %s does not exist.' % PROCESS_GROUP_NAME, key_error)
+        # TODO: When moving to Python 3, change to chained exception.
+        logger.error('Group %s does not exist.', PROCESS_GROUP_NAME)
+        raise key_error
 
     return program_user.pw_uid, program_group.gr_gid
 
@@ -100,9 +100,8 @@ def read_configuration_and_create_logger(program_uid, program_gid):
     config_helper = confighelper.ConfigHelper()
     config['log_level'] = config_helper.verify_string_exists(config_parser, 'log_level')
 
-    # Create logging directory.
-    log_mode = stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IRGRP | stat.S_IXGRP | \
-        stat.S_IROTH | stat.S_IXOTH
+    # Create logging directory.  drwxr-x---
+    log_mode = stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IRGRP | stat.S_IXGRP
     # TODO: Look into defaulting the logging to the console until the program gets more
     #   bootstrapped.
     print('Creating logging directory %s.' % LOG_DIR)
@@ -112,7 +111,7 @@ def read_configuration_and_create_logger(program_uid, program_gid):
     os.chown(LOG_DIR, program_uid, program_gid)
     os.chmod(LOG_DIR, log_mode)
 
-    # Temporarily drop permission and create the handle to the logger.
+    # Temporarily drop permissions and create the handle to the logger.
     os.setegid(program_gid)
     os.seteuid(program_uid)
     config_helper.configure_logger(os.path.join(LOG_DIR, LOG_FILE), config['log_level'])
@@ -146,7 +145,7 @@ def create_directory(system_path, program_dirs, uid, gid, mode):
     gid: The system group ID that should own be associated with the directory.
     mode: The umask of the directory access permissions.
     """
-    logger.info('Creating directory %s.' % os.path.join(system_path, program_dirs))
+    logger.info('Creating directory %s.', os.path.join(system_path, program_dirs))
 
     path = system_path
     for directory in program_dirs.strip('/').split('/'):
@@ -164,7 +163,7 @@ def drop_permissions_forever(uid, gid):
     uid: The system user ID to drop to.
     gid: The system group ID to drop to.
     """
-    logger.info('Dropping permissions for user %s.' % PROCESS_USERNAME)
+    logger.info('Dropping permissions for user %s.', PROCESS_USERNAME)
     os.initgroups(PROCESS_USERNAME, gid)
     os.setgid(gid)
     os.setuid(uid)
@@ -233,7 +232,7 @@ def print_bootstrap_lines(line):
     line: A Tor log line.
     """
     if 'Bootstrapped ' in line:
-        logger.info('%s' % line)
+        logger.info(line)
 
 
 def start_tor(config):
@@ -248,7 +247,7 @@ def start_tor(config):
         'DataDirectory': os.path.join(SYSTEM_DATA_DIR, TOR_DATA_DIRS),
     }
 
-    logger.info('Starting Tor on port %s.' % config['tor_socks_port'])
+    logger.info('Starting Tor on port %s.', config['tor_socks_port'])
     tor_process = stem.process.launch_tor_with_config(
         tor_config, init_msg_handler=print_bootstrap_lines)
 
@@ -258,7 +257,7 @@ def start_tor(config):
 def start_tor_before_daemonize(config):
     """Starts the tor process prior to daemonization. If the tor process fails too quickly,
     we assume tor is configured incorrectly and the program quits. Else, the program will
-    keep trying to connect to tor.
+    keep trying to connect to Tor even after daemonization.
 
     config: The program configuration object, mostly based on the configuration file.
     Returns a handle to the tor process.
@@ -271,8 +270,7 @@ def start_tor_before_daemonize(config):
         end_time = datetime.datetime.now()
         fail_time = end_time - start_time
 
-        logger.error('Failed start Tor. %s: %s' % (
-            type(os_error).__name__, os_error.message))
+        logger.error('Failed start Tor. %s: %s', type(os_error).__name__, str(os_error))
         logger.error(traceback.format_exc())
 
         # If tor quit in less than 30 seconds, assume something is misconfigured.
@@ -291,19 +289,17 @@ def is_site_up(url):
     """Checks if the specified website is available over Tor.
 
     url: The website to check for availability.
+    Returns True if the url is available. False otherwise.
     """
-    logger.debug('Checking url %s.' % url)
+    logger.debug('Checking url %s.', url)
 
     try:
         urllib.urlopen(url).read()
-        logger.debug('%s is up.' % url)
+        logger.debug('%s is up.', url)
         return True
     except Exception as exception:
-        logger.warn('Unable to reach %s. %s: %s' % (
-            url, type(exception).__name__, exception.message))
-        # The current version of socksipy contains a bug that causes this
-        #   message to raise the wrong kind of exception and print an unhelpful
-        #   message. It has been fixed in Ubuntu 16.04.
+        logger.warn('Unable to reach %s. %s: %s',
+                    url, type(exception).__name__, str(exception))
         logger.trace('Exception: %s' % traceback.format_exc())
         return False
 
@@ -317,14 +313,15 @@ def log_and_send_message(config, message, email_error_message):
     """
     logger.warn(message)
 
+    # Prevent the program from quitting if sending an e-mail fails for whatever reason.
     try:
         mail_message = gpgmailmessage.GpgMailMessage()
         mail_message.set_subject(config['email_subject'])
         mail_message.set_body(message)
         mail_message.queue_for_sending()
-    except Exception as detail:
-        logger.error('%s %s: %s', email_error_message, (
-            type(detail).__name__, detail.message))
+    except Exception as exception:
+        logger.error('%s %s: %s', email_error_message, type(exception).__name__,
+                     str(exception))
         logger.error(traceback.format_exc())
 
 
@@ -339,8 +336,8 @@ def main_loop(config, tor_process):
         try:
             tor_process = start_tor(config)
         except Exception as exception:
-            logger.error('Failed to start Tor. %s: %s' % (
-                type(exception).__name__, exception.message))
+            logger.error('Failed to start Tor. %s: %s', type(exception).__name__,
+                         str(exception))
             logger.error(traceback.format_exc())
             logger.error('Will try to connect again in 1 second.')
             time.sleep(1)
@@ -351,7 +348,7 @@ def main_loop(config, tor_process):
     prior_status = True  # Start the program assuming the website is up.
 
     logger.trace('Starting loop.')
-    while(True):
+    while True:
         # Let's not be too obvious about what this program does. Ramdomize the time between
         #   status checks.
         sleep_seconds = random.uniform(0, int(config['average_delay']))
@@ -386,12 +383,12 @@ config, config_helper, logger = read_configuration_and_create_logger(
 tor_process = None
 try:
     # Non-root users cannot create files in /run, so create a directory that can be written
-    #   to. Full access to user only.
+    #   to. Full access to user only.  drwx------
     create_directory(
         SYSTEM_PID_DIR, PROGRAM_PID_DIRS, program_uid, program_gid,
         stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
 
-    # Make the Tor data directory. Full access to user only.
+    # Make the Tor data directory. Full access to user only.  drwx------
     create_directory(
         SYSTEM_DATA_DIR, TOR_DATA_DIRS, program_uid, program_gid,
         stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
@@ -410,8 +407,8 @@ try:
         main_loop(config, tor_process)
 
 except Exception as exception:
-    logger.critical('Fatal %s: %s\n%s' % (type(exception).__name__, exception.message,
-                    traceback.format_exc()))
+    logger.critical('Fatal %s: %s\n%s', type(exception).__name__, str(exception),
+                    traceback.format_exc())
     if tor_process is not None:
         logger.info('Stopping tor.')
         tor_process.kill()
