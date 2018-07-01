@@ -71,13 +71,13 @@ def get_user_and_group_ids():
         program_user = pwd.getpwnam(PROCESS_USERNAME)
     except KeyError as key_error:
         # TODO: When moving to Python 3, change to chained exception.
-        logger.error('User %s does not exist.', PROCESS_USERNAME)
+        print('User %s does not exist.', PROCESS_USERNAME)
         raise key_error
     try:
         program_group = grp.getgrnam(PROCESS_GROUP_NAME)
     except KeyError as key_error:
         # TODO: When moving to Python 3, change to chained exception.
-        logger.error('Group %s does not exist.', PROCESS_GROUP_NAME)
+        print('Group %s does not exist.', PROCESS_GROUP_NAME)
         raise key_error
 
     return program_user.pw_uid, program_group.gr_gid
@@ -115,8 +115,6 @@ def read_configuration_and_create_logger(program_uid, program_gid):
     os.setegid(program_gid)
     os.seteuid(program_uid)
     config_helper.configure_logger(os.path.join(LOG_DIR, LOG_FILE), config['log_level'])
-    os.seteuid(os.getuid())
-    os.setegid(os.getgid())
 
     logger = logging.getLogger('%s-daemon' % PROGRAM_NAME)
 
@@ -128,6 +126,10 @@ def read_configuration_and_create_logger(program_uid, program_gid):
         config_parser, 'average_delay')
     config['email_subject'] = config_helper.verify_string_exists(
         config_parser, 'email_subject')
+
+    # Restore root permissions.
+    os.seteuid(os.getuid())
+    os.setegid(os.getgid())
 
     return (config, config_helper, logger)
 
@@ -142,7 +144,7 @@ def create_directory(system_path, program_dirs, uid, gid, mode):
     program_dirs: A string representing additional directories that should be created under
       the system path that should take on the following ownership and permissions.
     uid: The system user ID that should own the directory.
-    gid: The system group ID that should own be associated with the directory.
+    gid: The system group ID that should be associated with the directory.
     mode: The umask of the directory access permissions.
     """
     logger.info('Creating directory %s.', os.path.join(system_path, program_dirs))
