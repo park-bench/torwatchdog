@@ -62,6 +62,12 @@ PROCESS_GROUP_NAME = PROGRAM_NAME
 PROGRAM_UMASK = 0o027  # -rw-r----- and drwxr-x---
 
 
+class InitializationException(Exception):
+    """Indicates an expected fatal error occurred during program initialization.
+    Initialization is implied to mean, before daemonization.
+    """
+
+
 def get_user_and_group_ids():
     """Get user and group information for dropping privileges.
 
@@ -127,11 +133,23 @@ def read_configuration_and_create_logger(program_uid, program_gid):
     config['email_subject'] = config_helper.verify_string_exists(
         config_parser, 'email_subject')
 
-    # Restore root permissions.
-    os.seteuid(os.getuid())
-    os.setegid(os.getgid())
-
     return (config, config_helper, logger)
+
+
+# TODO: Consider checking ACLs. (gpgmailer issue 22)
+def verify_safe_file_permissions():
+    """Crashes the application if unsafe file permissions exist on application configuration
+    files.
+    """
+    # The configuration file should be owned by root.
+    config_file_stat = os.stat(CONFIGURATION_PATHNAME)
+    if config_file_stat.st_uid != 0:
+        raise InitializationException(
+            'File %s must be owned by root.' % CONFIGURATION_PATHNAME)
+    if bool(config_file_stat.st_mode & (stat.S_IROTH | stat.S_IWOTH | stat.S_IXOTH)):
+        raise InitializationException(
+            "File %s cannot have 'other user' access permissions set."
+            % CONFIGURATION_PATHNAME)
 
 
 def create_directory(system_path, program_dirs, uid, gid, mode):
@@ -384,6 +402,12 @@ config, config_helper, logger = read_configuration_and_create_logger(
 
 tor_process = None
 try:
+    verify_safe_file_permissions()
+
+    # Re-establish root permissions to create required directories.
+    os.seteuid(os.getuid())
+    os.setegid(os.getgid())
+
     # Non-root users cannot create files in /run, so create a directory that can be written
     #   to. Full access to user only.  drwx------
     create_directory(
