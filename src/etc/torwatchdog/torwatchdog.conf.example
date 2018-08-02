@@ -3,8 +3,8 @@
 
 [General]
 
-# The amount of logging detail. Either of critical, error, warn, info, debug,
-#   or trace.
+# Specifies the verbosity of the program's log. Valid values are CRITICAL, ERROR, WARNING,
+#   INFO, DEBUG, and TRACE. This value is case insensitive.
 log_level=info
 
 # The URL that torwatchdog checks.

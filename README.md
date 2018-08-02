@@ -53,7 +53,7 @@ _torwatchdog_ depends on two other Parkbench projects which must be installed fi
     this file to enter the Tor URL you want to monitor. Other settings can also be modified.
 7.  Use `chmod` to clear the _other user_ permissions bits of `watchman.conf`. Namely, remove
     read, write, and execute permissions for _other_.
-8.  To ease system maintenance, add `torwatchdog` as a supplimental group to administrative
+8.  To ease system maintenance, add `torwatchdog` as a supplemental group to administrative
     users. Doing this will allow these users to view torwatchdog log files.
 9.  Restart the daemon with `systemctl restart torwatchdog`. If the configuration file is
     valid, named correctly, and has the correct file permissions, the service will start

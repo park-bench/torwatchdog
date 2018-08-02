@@ -122,7 +122,7 @@ def read_configuration_and_create_logger(program_uid, program_gid):
     os.seteuid(program_uid)
     config_helper.configure_logger(os.path.join(LOG_DIR, LOG_FILE), config['log_level'])
 
-    logger = logging.getLogger('%s-daemon' % PROGRAM_NAME)
+    logger = logging.getLogger(__name__)
 
     logger.info('Verifying non-logging config')
     config['url'] = config_helper.verify_string_exists(config_parser, 'url')
@@ -197,7 +197,7 @@ def configure_tor_proxy(config):
     # Set socks proxy and wrap the urllib module
     # TODO: Eventually consider choosing a randomly available TCP port.
     socks.setdefaultproxy(
-        socks.PROXY_TYPE_SOCKS5, '127.0.0.1', int(config['tor_socks_port']))
+        socks.PROXY_TYPE_SOCKS5, '127.0.0.1', config['tor_socks_port'])
     socket.socket = socks.socksocket
     # Perform DNS resolution through the socket.
     socket.getaddrinfo = lambda *args: [(
