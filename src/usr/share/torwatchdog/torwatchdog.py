@@ -20,8 +20,8 @@ the site's availability changes.  Uses urllib to fetch the site using Socks for 
 the SOCKS_PORT.
 """
 
-# TODO: Eventually consider running in a chroot or jail.
-# TODO: Eventually check to see if the network/internet connection is down.
+# TODO: Eventually consider running in a chroot or jail. (gpgmailer issue 17)
+# TODO: Eventually check to see if the network/internet connection is down. (issue 4)
 
 __author__ = 'Joel Luellwitz and Andrew Klapp'
 __version__ = '0.8'
@@ -76,13 +76,13 @@ def get_user_and_group_ids():
     try:
         program_user = pwd.getpwnam(PROCESS_USERNAME)
     except KeyError as key_error:
-        # TODO: When moving to Python 3, change to chained exception.
+        # TODO: When moving to Python 3, change to chained exception. (gpgmailer issue 15)
         print('User %s does not exist.', PROCESS_USERNAME)
         raise key_error
     try:
         program_group = grp.getgrnam(PROCESS_GROUP_NAME)
     except KeyError as key_error:
-        # TODO: When moving to Python 3, change to chained exception.
+        # TODO: When moving to Python 3, change to chained exception. (gpgmailer issue 15)
         print('Group %s does not exist.', PROCESS_GROUP_NAME)
         raise key_error
 
@@ -101,7 +101,7 @@ def read_configuration_and_create_logger(program_uid, program_gid):
     config_parser = ConfigParser.SafeConfigParser()
     config_parser.read(CONFIGURATION_PATHNAME)
 
-    # Logging config goes first
+    # Logging config goes first.
     config = {}
     config_helper = confighelper.ConfigHelper()
     config['log_level'] = config_helper.verify_string_exists(config_parser, 'log_level')
@@ -109,7 +109,7 @@ def read_configuration_and_create_logger(program_uid, program_gid):
     # Create logging directory.  drwxr-x---
     log_mode = stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IRGRP | stat.S_IXGRP
     # TODO: Look into defaulting the logging to the console until the program gets more
-    #   bootstrapped.
+    #   bootstrapped. (gpgmailer issue 18)
     print('Creating logging directory %s.' % LOG_DIR)
     if not os.path.isdir(LOG_DIR):
         # Will throw exception if file cannot be created.
@@ -195,7 +195,7 @@ def configure_tor_proxy(config):
     config: The program configuration object, mostly based on the configuration file.
     """
     # Set socks proxy and wrap the urllib module
-    # TODO: Eventually consider choosing a randomly available TCP port.
+    # TODO: Eventually consider choosing a randomly available TCP port. (issue 8)
     socks.setdefaultproxy(
         socks.PROXY_TYPE_SOCKS5, '127.0.0.1', config['tor_socks_port'])
     socket.socket = socks.socksocket
@@ -297,7 +297,8 @@ def start_tor_before_daemonize(config):
         if fail_time >= datetime.timedelta(seconds=30):
             logger.error('Will try again after daemonize.')
         else:
-            # TODO: When moving to Python 3, convert to checked exception.
+            # TODO: When moving to Python 3, convert to checked exception. (gpgmailer issue
+            #   15)
             raise Exception(
                 'Tor failed to start in only %d seconds. Assuming the program is '
                 'misconfigured. Quitting.' % fail_time.total_seconds())
@@ -396,7 +397,6 @@ def main_loop(config, tor_process):
 
 os.umask(PROGRAM_UMASK)
 program_uid, program_gid = get_user_and_group_ids()
-
 config, config_helper, logger = read_configuration_and_create_logger(
     program_uid, program_gid)
 
