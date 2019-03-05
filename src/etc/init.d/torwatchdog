@@ -1,6 +1,6 @@
 #! /bin/sh
 
-# Copyright 2015-2018 Joel Allen Luellwitz and Andrew Klapp
+# Copyright 2015-2018 Joel Allen Luellwitz and Emily Frost
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -26,7 +26,7 @@
 ### END INIT INFO
 
 # Author: Joel Luellwitz <eviljoel@linux.com>
-# Author: Andrew Klapp <andklapp@null.net>
+# Author: Emily Frost <emfrost@posteo.net>
 
 # Do NOT "set -e"
 
