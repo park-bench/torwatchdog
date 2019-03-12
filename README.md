@@ -10,7 +10,7 @@ This is software is still in _beta_ and may not be ready for use in a production
 Bug fixes are welcome!
 
 ## Prerequisites
-This software is currently only suported in Ubuntu 18.04
+This software is currently only suported in Ubuntu 18.04.
 
 Currently, the only supported method for installation of this project is building and
 installing a Debian package. The rest of these instructions make the following assumptions:
