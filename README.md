@@ -3,25 +3,22 @@
 _torwatchdog_ is a daemon that checks the availability of an arbitrary URL through Tor and
 sends encrypted notification emails using our gpgmailer daemon when the availability changes.
 
-torwatchdog is licensed under the GNU GPLv3.
+_torwatchdog_ is licensed under the GNU GPLv3.
 
 This is software is still in _beta_ and may not be ready for use in a production environment.
 
 Bug fixes are welcome!
 
 ## Prerequisites
+This software is currently only suported in Ubuntu 18.04
 
 Currently, the only supported method for installation of this project is building and
 installing a Debian package. The rest of these instructions make the following assumptions:
 
-*   Your server is running Ubuntu 18.04 LTS. (Other operating systems may work, but are not
-    supported.)
-*   `build-essential` is installed on your build server.
-*   `devscripts` is installed on your build server.
-*   You are already familiar with using a Linux terminal.
-*   You are familiar with using `git` and GitHub.
-*   You already know how to use GnuPG.
-*   You are already somewhat familiar with using `debuild`.
+*   You are familiar with using a Linux terminal.
+*   You are somewhat familiar with using `debuild`.
+*   `debhelper` is installed.
+*   You are familiar with GnuPG.
 
 **NOTICE:** Some distributions, including Ubuntu, do not maintain a secure and updated
 version of Tor. Please manually add the Tor Project's Apt repository. Instructions are
@@ -51,8 +48,11 @@ _torwatchdog_ depends on two other Parkbench projects which must be installed fi
 6.  Copy or rename the example configuration file
     `/etc/torwatchdog/torwatchdog.conf.example` to `/etc/torwatchdog/torwatchdog.conf`. Edit
     this file to enter the Tor URL you want to monitor. Other settings can also be modified.
-7.  Use `chmod` to clear the _other user_ permissions bits of `watchman.conf`. Namely, remove
-    read, write, and execute permissions for _other_.
+7.  Change the ownership and permissions of the configuration file:
+```
+chown root:torwatchdog /etc/torwatchdog/torwatchdog.conf
+chmod u=rw,g=r,o= /etc/torwatchdog/torwatchdog.conf
+```
 8.  To ease system maintenance, add `torwatchdog` as a supplemental group to administrative
     users. Doing this will allow these users to view torwatchdog log files.
 9.  Restart the daemon with `systemctl restart torwatchdog`. If the configuration file is
