@@ -1,6 +1,6 @@
-#!/usr/bin/env python2
+#!/usr/bin/python2
 
-# Copyright 2015-2018 Joel Allen Luellwitz and Emily Frost
+# Copyright 2015-2019 Joel Allen Luellwitz and Emily Frost
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 """Verifies a website is running over Tor and sends an encrypted e-mail notification when
-the site's availability changes.  Uses urllib to fetch the site using Socks for Tor over
+the site's availability changes. Uses urllib to fetch the site using Socks for Tor over
 the SOCKS_PORT.
 """
 
@@ -26,7 +26,6 @@ the SOCKS_PORT.
 __author__ = 'Joel Luellwitz and Emily Frost'
 __version__ = '0.8'
 
-import ConfigParser
 import datetime
 import grp
 import logging
@@ -40,11 +39,12 @@ import sys
 import time
 import traceback
 import urllib
-import confighelper
+import ConfigParser
 import daemon
 from lockfile import pidlockfile
 import socks
 import stem.process
+import confighelper
 import gpgmailmessage
 
 # Constants
@@ -76,14 +76,18 @@ def get_user_and_group_ids():
     try:
         program_user = pwd.getpwnam(PROCESS_USERNAME)
     except KeyError as key_error:
-        # TODO: When moving to Python 3, change to chained exception. (gpgmailer issue 15)
-        print('User %s does not exist.', PROCESS_USERNAME)
+        # TODO: When switching to Python 3, convert to chained exception.
+        #   (gpgmailer issue 15)
+        print('User %s does not exist. %s: %s' % (
+            PROCESS_USERNAME, type(key_error).__name__, str(key_error)))
         raise key_error
     try:
         program_group = grp.getgrnam(PROCESS_GROUP_NAME)
     except KeyError as key_error:
-        # TODO: When moving to Python 3, change to chained exception. (gpgmailer issue 15)
-        print('Group %s does not exist.', PROCESS_GROUP_NAME)
+        # TODO: When switching to Python 3, convert to chained exception.
+        #   (gpgmailer issue 15)
+        print('Group %s does not exist. %s: %s' % (
+            PROCESS_GROUP_NAME, type(key_error).__name__, str(key_error)))
         raise key_error
 
     return program_user.pw_uid, program_group.gr_gid
@@ -98,42 +102,51 @@ def read_configuration_and_create_logger(program_uid, program_gid):
     program_gid: The system group ID this program should drop to before daemonization.
     Returns the read system config, a confighelper instance, and a logger instance.
     """
-    config_parser = ConfigParser.SafeConfigParser()
-    config_parser.read(CONFIGURATION_PATHNAME)
+    print('Reading %s...' % CONFIGURATION_PATHNAME)
 
-    # Logging config goes first.
+    if not os.path.isfile(CONFIGURATION_PATHNAME):
+        raise InitializationException(
+            'Configuration file %s does not exist. Quitting.' % CONFIGURATION_PATHNAME)
+
+    config_file = ConfigParser.SafeConfigParser()
+    config_file.read(CONFIGURATION_PATHNAME)
+
     config = {}
     config_helper = confighelper.ConfigHelper()
-    config['log_level'] = config_helper.verify_string_exists(config_parser, 'log_level')
+    # Figure out the logging options so that can start before anything else.
+    # TODO: Eventually add a verify_string_list method. (gpgmailer issue 20)
+    config['log_level'] = config_helper.verify_string_exists(config_file, 'log_level')
 
-    # Create logging directory.  drwxr-x---
+    # Create logging directory.  drwxr-x--- torwatchdog torwatchdog
     log_mode = stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IRGRP | stat.S_IXGRP
     # TODO: Look into defaulting the logging to the console until the program gets more
     #   bootstrapped. (gpgmailer issue 18)
     print('Creating logging directory %s.' % LOG_DIR)
     if not os.path.isdir(LOG_DIR):
-        # Will throw exception if file cannot be created.
+        # Will throw exception if directory cannot be created.
         os.makedirs(LOG_DIR, log_mode)
     os.chown(LOG_DIR, program_uid, program_gid)
     os.chmod(LOG_DIR, log_mode)
 
     # Temporarily drop permissions and create the handle to the logger.
+    print('Configuring logger.')
     os.setegid(program_gid)
     os.seteuid(program_uid)
     config_helper.configure_logger(os.path.join(LOG_DIR, LOG_FILE), config['log_level'])
 
     logger = logging.getLogger(__name__)
 
-    logger.info('Verifying non-logging config')
-    config['url'] = config_helper.verify_string_exists(config_parser, 'url')
-    config['tor_socks_port'] = config_helper.verify_integer_exists(
-        config_parser, 'tor_socks_port')
-    config['average_delay'] = config_helper.verify_number_exists(
-        config_parser, 'average_delay')
-    config['email_subject'] = config_helper.verify_string_exists(
-        config_parser, 'email_subject')
+    logger.info('Verifying non-logging configuration.')
 
-    return (config, config_helper, logger)
+    config['url'] = config_helper.verify_string_exists(config_file, 'url')
+    config['tor_socks_port'] = config_helper.verify_integer_exists(
+        config_file, 'tor_socks_port')
+    config['average_delay'] = config_helper.verify_number_exists(
+        config_file, 'average_delay')
+    config['email_subject'] = config_helper.verify_string_exists(
+        config_file, 'email_subject')
+
+    return config, config_helper, logger
 
 
 # TODO: Consider checking ACLs. (gpgmailer issue 22)
@@ -163,7 +176,7 @@ def create_directory(system_path, program_dirs, uid, gid, mode):
       the system path that should take on the following ownership and permissions.
     uid: The system user ID that should own the directory.
     gid: The system group ID that should be associated with the directory.
-    mode: The umask of the directory access permissions.
+    mode: The unix standard 'mode bits' that should be associated with the directory.
     """
     logger.info('Creating directory %s.', os.path.join(system_path, program_dirs))
 
@@ -219,11 +232,11 @@ def sig_term_handler(signal, stack_frame):
 
 def setup_daemon_context(log_file_handle, program_uid, program_gid):
     """Creates the daemon context. Specifies daemon permissions, PID file information, and
-    signal handler.
+    the signal handler.
 
     log_file_handle: The file handle to the log file.
-    program_uid: The system user ID the daemon should run as.
-    program_gid: The system group ID the daemon should run as.
+    program_uid: The system user ID that should own the daemon process.
+    program_gid: The system group ID that should be assigned to the daemon process.
     Returns the daemon context.
     """
     daemon_context = daemon.DaemonContext(
@@ -231,15 +244,15 @@ def setup_daemon_context(log_file_handle, program_uid, program_gid):
         pidfile=pidlockfile.PIDLockFile(
             os.path.join(SYSTEM_PID_DIR, PROGRAM_PID_DIRS, PID_FILE)),
         umask=PROGRAM_UMASK,
-        )
+    )
 
     daemon_context.signal_map = {
         signal.SIGTERM: sig_term_handler,
-        }
+    }
 
     daemon_context.files_preserve = [log_file_handle]
 
-    # Set the UID and PID to 'torwatchdog' user and group.
+    # Set the UID and GID to 'torwatchdog' user and group.
     daemon_context.uid = program_uid
     daemon_context.gid = program_gid
 
@@ -409,15 +422,14 @@ try:
     os.setegid(os.getgid())
 
     # Non-root users cannot create files in /run, so create a directory that can be written
-    #   to. Full access to user only.  drwx------
-    create_directory(
-        SYSTEM_PID_DIR, PROGRAM_PID_DIRS, program_uid, program_gid,
-        stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
+    #   to. Full access to user only.  drwx------ torwatchdog torwatchdog
+    create_directory(SYSTEM_PID_DIR, PROGRAM_PID_DIRS, program_uid, program_gid,
+                     stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
 
-    # Make the Tor data directory. Full access to user only.  drwx------
-    create_directory(
-        SYSTEM_DATA_DIR, TOR_DATA_DIRS, program_uid, program_gid,
-        stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
+    # Make the Tor data directory. Full access to user only.
+    #   drwx------ torwatchdog torwatchdog
+    create_directory(SYSTEM_DATA_DIR, TOR_DATA_DIRS, program_uid, program_gid,
+                     stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
 
     # Configuration has been read and directories setup. Now drop permissions forever.
     drop_permissions_forever(program_uid, program_gid)
@@ -429,6 +441,7 @@ try:
 
     tor_process = start_tor_before_daemonize(config)
 
+    logger.info('Daemonizing...')
     with daemon_context:
         main_loop(config, tor_process)
 
