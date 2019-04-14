@@ -1,6 +1,6 @@
 #! /bin/sh
 
-# Copyright 2015-2018 Joel Allen Luellwitz and Emily Frost
+# Copyright 2015-2019 Joel Allen Luellwitz and Emily Frost
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -33,7 +33,8 @@
 PATH=/sbin:/usr/sbin:/bin:/usr/bin
 DESC="Tor Hidden Service Watchdog"
 NAME=torwatchdog
-DAEMON=/usr/share/torwatchdog/$NAME.py
+PROCESS_NAME=$NAME.py
+DAEMON=/usr/share/$NAME/$NAME.py
 DAEMON_ARGS=
 PIDFILE=/run/$NAME/$NAME.pid
 SCRIPTNAME=/etc/init.d/$NAME
@@ -61,11 +62,10 @@ do_start()
 	#   0 if daemon has been started
 	#   1 if daemon was already running
 	#   2 if daemon could not be started
-	start-stop-daemon --start --quiet --pidfile "$PIDFILE" --name python2 --startas "$DAEMON" --test > /dev/null \
-		|| return 1
-	start-stop-daemon --start --quiet --pidfile "$PIDFILE" --name python2 --startas "$DAEMON" -- \
-		"$DAEMON_ARGS" \
-		|| return 2
+	start-stop-daemon --start --quiet --pidfile "$PIDFILE" --name "$PROCESS_NAME" \
+            --startas "$DAEMON" --test > /dev/null || return 1
+	start-stop-daemon --start --quiet --pidfile "$PIDFILE" --name "$PROCESS_NAME" \
+            --startas "$DAEMON" -- "$DAEMON_ARGS" || return 2
 }
 
 #
@@ -78,7 +78,8 @@ do_stop()
 	#   1 if daemon was already stopped
 	#   2 if daemon could not be stopped
 	#   other if a failure occurred
-	start-stop-daemon --stop --quiet --retry=TERM/30/KILL/5 --pidfile "$PIDFILE" --name python2
+	start-stop-daemon --stop --quiet --retry=TERM/30/KILL/5 --pidfile "$PIDFILE" \
+            --name "$PROCESS_NAME"
 	RETVAL="$?"
 	[ "$RETVAL" = 2 ] && return 2
 	# Many daemons don't delete their pidfiles when they exit.
