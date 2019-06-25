@@ -44,7 +44,7 @@ import daemon
 from lockfile import pidlockfile
 import socks
 import stem.process
-import confighelper
+from parkbenchcommon import confighelper
 import gpgmailmessage
 
 # Constants
