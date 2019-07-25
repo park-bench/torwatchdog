@@ -1,4 +1,5 @@
 debian/debhelper-build-stamp
+debian/.debhelper/*
 debian/files
 debian/tmp
 debian/torwatchdog.debhelper.log

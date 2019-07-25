@@ -16,5 +16,5 @@ tor_socks_port=6613
 # Average delay between checks, in seconds.
 average_delay=300
 
-# Subject line, an arbitary string. Subject lines are NOT encrypted.
+# Optional subject line, an arbitary string. Subject lines are NOT encrypted.
 email_subject=

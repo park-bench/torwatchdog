@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/python3
 
 # Copyright 2015-2019 Joel Allen Luellwitz and Emily Frost
 #
@@ -38,8 +38,8 @@ import stat
 import sys
 import time
 import traceback
-import urllib
-import ConfigParser
+import urllib.request
+import configparser
 import daemon
 from lockfile import pidlockfile
 import socks
@@ -108,7 +108,7 @@ def read_configuration_and_create_logger(program_uid, program_gid):
         raise InitializationException(
             'Configuration file %s does not exist. Quitting.' % CONFIGURATION_PATHNAME)
 
-    config_file = ConfigParser.SafeConfigParser()
+    config_file = configparser.SafeConfigParser()
     config_file.read(CONFIGURATION_PATHNAME)
 
     config = {}
@@ -143,7 +143,7 @@ def read_configuration_and_create_logger(program_uid, program_gid):
         config_file, 'tor_socks_port')
     config['average_delay'] = config_helper.verify_number_exists(
         config_file, 'average_delay')
-    config['email_subject'] = config_helper.verify_string_exists(
+    config['email_subject'] = config_helper.get_string_if_exists(
         config_file, 'email_subject')
 
     return config, config_helper, logger
@@ -328,12 +328,12 @@ def is_site_up(url):
     logger.debug('Checking url %s.', url)
 
     try:
-        urllib.urlopen(url).read()
+        urllib.request.urlopen(url).read
         logger.debug('%s is up.', url)
         return True
     except Exception as exception:
-        logger.warn('Unable to reach %s. %s: %s',
-                    url, type(exception).__name__, str(exception))
+        logger.warning('Unable to reach %s. %s: %s',
+                       url, type(exception).__name__, str(exception))
         logger.trace('Exception: %s' % traceback.format_exc())
         return False
 
@@ -345,7 +345,7 @@ def log_and_send_message(config, message, email_error_message):
     message: The e-mail message body.
     email_error_message: A message to log in the event of an error while sending the e-mail.
     """
-    logger.warn(message)
+    logger.warning(message)
 
     # Prevent the program from quitting if sending an e-mail fails for whatever reason.
     try:
@@ -434,10 +434,11 @@ try:
     # Configuration has been read and directories setup. Now drop permissions forever.
     drop_permissions_forever(program_uid, program_gid)
 
-    configure_tor_proxy(config)
-
     daemon_context = setup_daemon_context(
         config_helper.get_log_file_handle(), program_uid, program_gid)
+
+    # TODO: This had to be moved from above the setup_daemon_context call. Figure out why.
+    configure_tor_proxy(config)
 
     tor_process = start_tor_before_daemonize(config)
 
