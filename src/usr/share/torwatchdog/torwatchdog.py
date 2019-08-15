@@ -402,48 +402,55 @@ def main_loop(config, tor_process):
         prior_status = current_status
 
 
-os.umask(PROGRAM_UMASK)
-program_uid, program_gid = get_user_and_group_ids()
-config, config_helper, logger = read_configuration_and_create_logger(
-    program_uid, program_gid)
+def main():
+    """The container function for the entire script. It loads and verifies configuration,
+    then daemonizes and starts the main loop.
+    """
+    os.umask(PROGRAM_UMASK)
+    program_uid, program_gid = get_user_and_group_ids()
+    config, config_helper, logger = read_configuration_and_create_logger(
+        program_uid, program_gid)
 
-tor_process = None
-try:
-    verify_safe_file_permissions()
+    tor_process = None
+    try:
+        verify_safe_file_permissions()
 
-    # Re-establish root permissions to create required directories.
-    os.seteuid(os.getuid())
-    os.setegid(os.getgid())
+        # Re-establish root permissions to create required directories.
+        os.seteuid(os.getuid())
+        os.setegid(os.getgid())
 
-    # Non-root users cannot create files in /run, so create a directory that can be written
-    #   to. Full access to user only.  drwx------ torwatchdog torwatchdog
-    create_directory(SYSTEM_PID_DIR, PROGRAM_PID_DIRS, program_uid, program_gid,
-                     stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
+        # Non-root users cannot create files in /run, so create a directory that can be written
+        #   to. Full access to user only.  drwx------ torwatchdog torwatchdog
+        create_directory(SYSTEM_PID_DIR, PROGRAM_PID_DIRS, program_uid, program_gid,
+                         stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
 
-    # Make the Tor data directory. Full access to user only.
-    #   drwx------ torwatchdog torwatchdog
-    create_directory(SYSTEM_DATA_DIR, TOR_DATA_DIRS, program_uid, program_gid,
-                     stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
+        # Make the Tor data directory. Full access to user only.
+        #   drwx------ torwatchdog torwatchdog
+        create_directory(SYSTEM_DATA_DIR, TOR_DATA_DIRS, program_uid, program_gid,
+                         stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
 
-    # Configuration has been read and directories setup. Now drop permissions forever.
-    drop_permissions_forever(program_uid, program_gid)
+        # Configuration has been read and directories setup. Now drop permissions forever.
+        drop_permissions_forever(program_uid, program_gid)
 
-    daemon_context = setup_daemon_context(
-        config_helper.get_log_file_handle(), program_uid, program_gid)
+        daemon_context = setup_daemon_context(
+            config_helper.get_log_file_handle(), program_uid, program_gid)
 
-    # TODO: This had to be moved from above the setup_daemon_context call. Figure out why.
-    configure_tor_proxy(config)
+        # TODO: This had to be moved from above the setup_daemon_context call. Figure out why.
+        configure_tor_proxy(config)
 
-    tor_process = start_tor_before_daemonize(config)
+        tor_process = start_tor_before_daemonize(config)
 
-    logger.info('Daemonizing...')
-    with daemon_context:
-        main_loop(config, tor_process)
+        logger.info('Daemonizing...')
+        with daemon_context:
+            main_loop(config, tor_process)
 
-except Exception as exception:
-    logger.critical('Fatal %s: %s\n%s', type(exception).__name__, str(exception),
-                    traceback.format_exc())
-    if tor_process is not None:
-        logger.info('Stopping tor.')
-        tor_process.kill()
-    raise exception
+    except Exception as exception:
+        logger.critical('Fatal %s: %s\n%s', type(exception).__name__, str(exception),
+                        traceback.format_exc())
+        if tor_process is not None:
+            logger.info('Stopping tor.')
+            tor_process.kill()
+        raise exception
+
+if __name__ == '__main__':
+    main()
