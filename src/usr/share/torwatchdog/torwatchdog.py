@@ -408,6 +408,7 @@ def main():
     """
     os.umask(PROGRAM_UMASK)
     program_uid, program_gid = get_user_and_group_ids()
+    global logger
     config, config_helper, logger = read_configuration_and_create_logger(
         program_uid, program_gid)
 
