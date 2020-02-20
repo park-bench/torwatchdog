@@ -31,7 +31,7 @@ is: A3C4 F0F9 79CA A22C DBA8  F512 EE8C BC9E 886D DD89
 
 _torwatchdog_ depends on two other Parkbench projects which must be installed first:
 
-*  [_confighelper_](https://github.com/park-bench/confighelper)
+*  [_parkbench-common_](https://github.com/park-bench/parkbench-common)
 *  [_gpgmailer_](https://github.com/park-bench/gpgmailer)
 
 ## Steps to Build and Install

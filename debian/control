@@ -7,5 +7,5 @@ Standards-Version: 3.9.6.1
 
 Package: torwatchdog
 Architecture: all
-Depends: adduser (>= 3.11), confighelper (>=0.8), gpgmailer (>=0.8), python-daemon, python-stem, python-socks, tor
+Depends: adduser (>= 3.11), gpgmailer (>=0.8), parkbench-common (>=0.8), python-daemon, python-stem, python-socks, tor
 Description: Daemon that checks URL resolution through Tor and sends encrypted notifications of resolution status changes.
