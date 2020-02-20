@@ -217,7 +217,7 @@ def configure_tor_proxy(config):
         socket.AF_INET, socket.SOCK_STREAM, 6, '', (args[0], args[1]))]
 
 
-def sig_term_handler(signal, stack_frame):
+def sig_term_handler(signal, stack_frame):  #pylint: disable=unused-argument
     """Signal handler for SIGTERM. Kills Tor and quits when SIGTERM is received.
 
     signal: Object representing the signal thrown.
