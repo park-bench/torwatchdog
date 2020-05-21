@@ -133,10 +133,10 @@ def read_configuration_and_create_logger(program_uid, program_gid):
     logger.info('Verifying non-logging configuration.')
 
     config['url'] = config_helper.verify_string_exists(config_file, 'url')
-    config['tor_socks_port'] = config_helper.verify_integer_exists(
-        config_file, 'tor_socks_port')
-    config['average_delay'] = config_helper.verify_number_exists(
-        config_file, 'average_delay')
+    config['tor_socks_port'] = config_helper.verify_integer_within_range(
+        config_file, 'tor_socks_port', lower_bound=1, upper_bound=65536)
+    config['average_delay'] = config_helper.verify_number_within_range(
+        config_file, 'average_delay', lower_bound=0.000001)
     config['email_subject'] = config_helper.get_string_if_exists(
         config_file, 'email_subject')
 
@@ -197,7 +197,7 @@ def drop_permissions_forever(uid, gid):
 
 
 def configure_tor_proxy(config):
-    """Configures the tor proxy settings.
+    """Configures the Tor proxy settings.
 
     config: The program configuration object, mostly based on the configuration file.
     """
@@ -211,16 +211,34 @@ def configure_tor_proxy(config):
         socket.AF_INET, socket.SOCK_STREAM, 6, '', (args[0], args[1]))]
 
 
+def stop_tor_before_exit(tor_wrapper_process):
+    """Stops the Tor wrapper, first by being nice and using SIGTERM and then SIGKILL.
+
+    tor_wrapper_process: A handle to the Tor wrapper process.
+    """
+    if tor_wrapper_process is not None:
+        logger.info('Waiting for one second for Tor to terminate.')
+        tor_wrapper_process.terminate()
+        time.sleep(1)
+        if tor_wrapper_process.poll() is None:
+            logger.error('Tor process did not terminate. Attempting to kill tor.')
+            # Technically this is a bit racy as setsid() might not have been called by the
+            #   tor-stdout-fix.py script yet. However, we've waited at least a whole second
+            #   for the setsid() instruction to execute. I'm not too concerned about it, as
+            #   something would have had to go terribly wrong for us to reach this code
+            #   anyway.
+            os.killpg(tor_wrapper_process.pid, signal.SIGKILL)
+
+
 def sig_term_handler(signal, stack_frame):  #pylint: disable=unused-argument
-    """Signal handler for SIGTERM. Kills Tor and quits when SIGTERM is received.
+    """Signal handler for SIGTERM. When SIGTERM is received, stops the Tor wrapper and
+    quits.
 
     signal: Object representing the signal thrown.
     stack_frame: Represents the stack frame.
     """
     logger.info('SIGTERM received. Quitting.')
-    if tor_process is not None:
-        logger.info('Stopping tor.')
-        tor_process.kill()
+    stop_tor_before_exit(tor_wrapper_process)
     sys.exit(0)
 
 
@@ -234,6 +252,9 @@ def setup_daemon_context(log_file_handle, program_uid, program_gid):
     Returns the daemon context.
     """
     daemon_context = daemon.DaemonContext(
+        # This next line prevents a Python 3 related hang. This should evalute to True
+        #   anyway.
+        detach_process=True,
         working_directory='/',
         pidfile=pidlockfile.PIDLockFile(
             os.path.join(SYSTEM_PID_DIR, PROGRAM_PID_DIRS, PID_FILE)),
@@ -258,15 +279,14 @@ def print_bootstrap_lines(line):
 
     line: A Tor log line.
     """
-    if 'Bootstrapped ' in line:
-        logger.info(line)
+    logger.info(line)
 
 
 def start_tor(config):
-    """Starts the tor process.
+    """Starts the Tor process.
 
     config: The program configuration object, mostly based on the configuration file.
-    Returns a handle to the tor process.
+    Returns a handle to the Tor wrapper process.
     """
     # Note that the 'take_ownership' option does not work correctly after forking.
     tor_config = {
@@ -275,32 +295,35 @@ def start_tor(config):
     }
 
     logger.info('Starting Tor on port %s.', config['tor_socks_port'])
-    tor_process = stem.process.launch_tor_with_config(
-        tor_config, init_msg_handler=print_bootstrap_lines)
+    tor_wrapper_process = stem.process.launch_tor_with_config(
+        tor_config,
+        tor_cmd=os.path.join('/usr/share', PROGRAM_NAME, 'tor-stdout-fix.py'),
+        init_msg_handler=print_bootstrap_lines)
 
-    return tor_process
+    return tor_wrapper_process
 
 
 def start_tor_before_daemonize(config):
-    """Starts the tor process prior to daemonization. If the tor process fails too quickly,
-    we assume tor is configured incorrectly and the program quits. Else, the program will
+    """Starts the Tor process prior to daemonization. If the Tor process fails too quickly,
+    we assume Tor is configured incorrectly and the program quits. Else, the program will
     keep trying to connect to Tor even after daemonization.
 
     config: The program configuration object, mostly based on the configuration file.
-    Returns a handle to the tor process.
+    Returns a handle to the Tor wrapper process.
     """
-    tor_process = None
+    tor_wrapper_process = None
     start_time = datetime.datetime.now()
     try:
-        tor_process = start_tor(config)
+        tor_wrapper_process = start_tor(config)
     except OSError as os_error:
         end_time = datetime.datetime.now()
         fail_time = end_time - start_time
 
-        logger.error('Failed start Tor. %s: %s', type(os_error).__name__, str(os_error))
-        logger.error(traceback.format_exc())
+        logger.error(
+            'Failed start Tor. %s: %s\n%s', type(os_error).__name__, str(os_error),
+            traceback.format_exc())
 
-        # If tor quit in less than 30 seconds, assume something is misconfigured.
+        # If Tor quit in less than 30 seconds, assume something is misconfigured.
         if fail_time >= datetime.timedelta(seconds=30):
             logger.error('Will try again after daemonize.')
         else:
@@ -308,10 +331,36 @@ def start_tor_before_daemonize(config):
                 'Tor failed to start in only %d seconds. Assuming the program is '
                 'misconfigured. Quitting.' % fail_time.total_seconds()) from os_error
 
-    return tor_process
+    return tor_wrapper_process
 
 
-def is_site_up(url):
+def restart_tor_if_needed(config, tor_wrapper_process):
+    """If Tor hasn't started or has stopped running, try to connect.
+
+    config: The program configuration object, mostly based on the configuration file.
+    tor_wrapper_process: A handle to the Tor wrapper process.
+    Returns a handle to the current Tor wrapper process. Might be a different handle than
+      the parameter above.
+    """
+    while tor_wrapper_process is None or tor_wrapper_process.poll() is not None:
+        if tor_wrapper_process.poll() is not None:
+            logger.error(
+                'Tor process unexpectantly exited with exit code %d. Attempting to restart '
+                'tor.', tor_wrapper_process.poll())
+        try:
+            tor_wrapper_process = start_tor(config)
+        except Exception as exception:
+            tor_wrapper_process = None
+            logger.error(
+                'Failed to start Tor. %s: %s\n%s\nWill try to connect again in 1 second.',
+                type(exception).__name__, str(exception),
+                traceback.format_exc())
+            time.sleep(1)
+
+    return tor_wrapper_process
+
+
+def get_url_availability(url):
     """Checks if the specified website is available over Tor.
 
     url: The website to check for availability.
@@ -346,58 +395,64 @@ def log_and_send_message(config, message, email_error_message):
         mail_message.set_body(message)
         mail_message.queue_for_sending()
     except Exception as exception:
-        logger.error('%s %s: %s', email_error_message, type(exception).__name__,
-                     str(exception))
-        logger.error(traceback.format_exc())
+        logger.error('%s %s: %s\n%s', email_error_message, type(exception).__name__,
+                     str(exception), traceback.format_exc())
 
 
-def main_loop(config, tor_process):
+def check_availability_and_send_notification(config, prior_availability):
+    """Checks if the website is available and sends a notification if the availability
+    status changes.
+
+    config: The program configuration object, mostly based on the configuration file.
+    prior_availability: The availability status of the prior website access attempt.
+    Returns True if the url is available. False otherwise.
+    """
+    current_availability = get_url_availability(config['url'])
+
+    # Send e-mail if the site just went down
+    if (not current_availability and prior_availability):
+        message = 'Down notification for %s at %s.' % (
+            config['url'], datetime.datetime.now())
+        email_error_message = 'Could not send down notification.'
+        log_and_send_message(config, message, email_error_message)
+
+    # Send e-mail if the site just came back up
+    if (current_availability and not prior_availability):
+        message = 'Up notification for %s at %s.' % (config['url'], datetime.datetime.now())
+        email_error_message = 'Could not send up notification.'
+        log_and_send_message(config, message, email_error_message)
+
+    return current_availability
+
+
+def main_loop(config, tor_wrapper_process):
     """The main program loop.
 
     config: The program configuration object, mostly based on the configuration file.
-    tor_process: A handle to the tor process.
+    tor_wrapper_process: A handle to the Tor wrapper process.
     """
-    # If tor hasn't started, keep trying.
-    while tor_process is None:
-        try:
-            tor_process = start_tor(config)
-        except Exception as exception:
-            logger.error('Failed to start Tor. %s: %s', type(exception).__name__,
-                         str(exception))
-            logger.error(traceback.format_exc())
-            logger.error('Will try to connect again in 1 second.')
-            time.sleep(1)
-
     # Uses /dev/urandom, for determining how long to sleep the main loop.
     random.SystemRandom()
 
-    prior_status = True  # Start the program assuming the website is up.
+    prior_availability = True  # Start the program assuming the website is up.
 
-    logger.trace('Starting loop.')
+    logger.trace('Starting main loop.')
     while True:
-        # Let's not be too obvious about what this program does. Ramdomize the time between
-        #   status checks.
-        sleep_seconds = random.uniform(0, int(config['average_delay']))
-        logger.trace('Sleeping for %d seconds.' % sleep_seconds)
-        time.sleep(sleep_seconds)
+        try:
+            tor_wrapper_process = restart_tor_if_needed(config, tor_wrapper_process)
 
-        current_status = is_site_up(config['url'])
+            # Let's not be too obvious about what this program does. Ramdomize the time
+            #   between availability checks.
+            sleep_seconds = random.uniform(0, float(config['average_delay']))
+            logger.trace('Sleeping for %d seconds.' % sleep_seconds)
+            time.sleep(sleep_seconds)
 
-        # Send e-mail if the site just went down
-        if (not current_status and prior_status):
-            message = 'Down notification for %s at %s.' % (
-                config['url'], datetime.datetime.now())
-            email_error_message = 'Could not send down notification.'
-            log_and_send_message(config, message, email_error_message)
-
-        # Send e-mail if the site just came back up
-        if (current_status and not prior_status):
-            message = 'Up notification for %s at %s.' % (
-                config['url'], datetime.datetime.now())
-            email_error_message = 'Could not send up notification.'
-            log_and_send_message(config, message, email_error_message)
-
-        prior_status = current_status
+            prior_availability = check_availability_and_send_notification(
+                config, prior_availability)
+        except Exception as exception:
+            logger.error('Unexpected exception %s: %s.\n%s', type(exception).__name__,
+                         str(exception), traceback.format_exc())
+            time.sleep(1)  # Sleep so we don't tax the CPU.
 
 
 def main():
@@ -410,8 +465,8 @@ def main():
     config, config_helper, logger = read_configuration_and_create_logger(
         program_uid, program_gid)
 
-    global tor_process
-    tor_process = None
+    global tor_wrapper_process
+    tor_wrapper_process = None
     try:
         verify_safe_file_permissions()
 
@@ -432,26 +487,24 @@ def main():
         # Configuration has been read and directories setup. Now drop permissions forever.
         drop_permissions_forever(program_uid, program_gid)
 
+        configure_tor_proxy(config)
+
         daemon_context = setup_daemon_context(
             config_helper.get_log_file_handle(), program_uid, program_gid)
 
-        # TODO: This had to be moved from above the setup_daemon_context call. Figure out
-        #   why.
-        configure_tor_proxy(config)
-
-        tor_process = start_tor_before_daemonize(config)
+        tor_wrapper_process = start_tor_before_daemonize(config)
 
         logger.info('Daemonizing...')
         with daemon_context:
-            main_loop(config, tor_process)
+            main_loop(config, tor_wrapper_process)
 
     except Exception as exception:
         logger.critical('Fatal %s: %s\n%s', type(exception).__name__, str(exception),
                         traceback.format_exc())
-        if tor_process is not None:
-            logger.info('Stopping tor.')
-            tor_process.kill()
+        stop_tor_before_exit(tor_wrapper_process)
+
         raise exception
+
 
 if __name__ == '__main__':
     main()
