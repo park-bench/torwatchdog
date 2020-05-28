@@ -222,12 +222,8 @@ def stop_tor_before_exit(tor_wrapper_process):
         time.sleep(1)
         if tor_wrapper_process.poll() is None:
             logger.error('Tor process did not terminate. Attempting to kill tor.')
-            # Technically this is a bit racy as setsid() might not have been called by the
-            #   tor-stdout-fix.py script yet. However, we've waited at least a whole second
-            #   for the setsid() instruction to execute. I'm not too concerned about it, as
-            #   something would have had to go terribly wrong for us to reach this code
-            #   anyway.
-            os.killpg(tor_wrapper_process.pid, signal.SIGKILL)
+            # Since Tor is linked to the wrapper process, Tor should quickly self terminate.
+            tor_wrapper_process.kill()
 
 
 def sig_term_handler(signal, stack_frame):  #pylint: disable=unused-argument
@@ -279,7 +275,7 @@ def print_bootstrap_lines(line):
 
     line: A Tor log line.
     """
-    logger.info(line)
+    logger.info("Tor: %s" % line)
 
 
 def start_tor(config):
@@ -334,6 +330,24 @@ def start_tor_before_daemonize(config):
     return tor_wrapper_process
 
 
+def is_tor_wrapper_process_running(tor_wrapper_process):
+    """Checks if the Tor wrapper process is still running. Popen.poll() does not work when a
+    subprocess is started before Daemonize, so this method uses an alternate algorithm to
+    determine is if the subprocess is still running. This method sends USR1 to the
+    subprocess. If a ProcessLookupError is raised, the subprocess is no longer running.
+
+    tor_wrapper_process: A handle to the Tor wrapper process.
+    Returns True if the subprocess is still running. False otherwise.
+    """
+    running = True
+    try:
+        tor_wrapper_process.send_signal(signal.SIGUSR1)
+    except ProcessLookupError:
+        running = False
+
+    return running
+
+
 def restart_tor_if_needed(config, tor_wrapper_process):
     """If Tor hasn't started or has stopped running, try to connect.
 
@@ -342,11 +356,12 @@ def restart_tor_if_needed(config, tor_wrapper_process):
     Returns a handle to the current Tor wrapper process. Might be a different handle than
       the parameter above.
     """
-    while tor_wrapper_process is None or tor_wrapper_process.poll() is not None:
-        if tor_wrapper_process.poll() is not None:
+    while tor_wrapper_process is None or not is_tor_wrapper_process_running(
+            tor_wrapper_process):
+        if tor_wrapper_process is not None:
             logger.error(
                 'Tor process unexpectantly exited with exit code %d. Attempting to restart '
-                'tor.', tor_wrapper_process.poll())
+                'Tor.', tor_wrapper_process.returncode)
         try:
             tor_wrapper_process = start_tor(config)
         except Exception as exception:
@@ -418,7 +433,8 @@ def check_availability_and_send_notification(config, prior_availability):
 
     # Send e-mail if the site just came back up
     if (current_availability and not prior_availability):
-        message = 'Up notification for %s at %s.' % (config['url'], datetime.datetime.now())
+        message = 'Up notification for %s at %s.' % (
+            config['url'], datetime.datetime.now())
         email_error_message = 'Could not send up notification.'
         log_and_send_message(config, message, email_error_message)
 

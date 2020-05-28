@@ -15,12 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-# Do this first to make race conditions less likely. Allows the parent process to kill by
-#   process group ID.
-# TODO: Determine if this is necessary.
 import os
-#os.setsid()
-
 import re
 import signal
 import subprocess
@@ -38,6 +33,15 @@ def sig_term_handler(signal, stack_frame):  #pylint: disable=unused-argument
     sys.exit(0)
 
 
+def sig_usr1_handler(signal, stack_frame):  #pylint: disable=unused-argument
+    """Signal handler for USR1. Does nothing. Used by torwatchdog.py to see if this program
+    is still running.
+
+    signal: Object representing the signal thrown.
+    stack_frame: Represents the stack frame.
+    """
+
+
 def write_line(output_line):
     """Writes a line to stdout but handles the case where the stdout pipe is closed. If a
     BrokenPipeError is raised, stdout is redirected to /dev/null.
@@ -45,7 +49,7 @@ def write_line(output_line):
     output_line: The line to write to stdout.
     """
     try:
-        sys.stdout.write(output_line)
+        sys.stdout.write('%s\n' % output_line)
         sys.stdout.flush()
     except BrokenPipeError:
         # Python flushes standard streams on exit; redirect remaining output
@@ -57,8 +61,11 @@ def write_line(output_line):
 global tor_process
 
 signal.signal(signal.SIGTERM, sig_term_handler)
+signal.signal(signal.SIGUSR1, sig_usr1_handler)
 
-command_and_arguments = sys.argv[1:].insert(0, 'tor')
+command_and_arguments = sys.argv[1:]
+command_and_arguments.insert(0, 'tor')
+command_and_arguments += ['__OwningControllerProcess', str(os.getpid())]
 tor_process = None
 bootstrap_finished_regex = re.compile('(.*Bootstrapped 100%)(.*)')
 try:
