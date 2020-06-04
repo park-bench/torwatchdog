@@ -211,19 +211,19 @@ def configure_tor_proxy(config):
         socket.AF_INET, socket.SOCK_STREAM, 6, '', (args[0], args[1]))]
 
 
-def stop_tor_before_exit(tor_wrapper_process):
+def stop_tor_before_exit(wrapper_process):
     """Stops the Tor wrapper, first by being nice and using SIGTERM and then SIGKILL.
 
     tor_wrapper_process: A handle to the Tor wrapper process.
     """
-    if tor_wrapper_process is not None:
+    if wrapper_process is not None:
         logger.info('Waiting for one second for Tor to terminate.')
-        tor_wrapper_process.terminate()
+        wrapper_process.terminate()
         time.sleep(1)
-        if tor_wrapper_process.poll() is None:
+        if wrapper_process.poll() is None:
             logger.error('Tor process did not terminate. Attempting to kill tor.')
             # Since Tor is linked to the wrapper process, Tor should quickly self terminate.
-            tor_wrapper_process.kill()
+            wrapper_process.kill()
 
 
 def sig_term_handler(signal, stack_frame):  #pylint: disable=unused-argument
@@ -291,12 +291,12 @@ def start_tor(config):
     }
 
     logger.info('Starting Tor on port %s.', config['tor_socks_port'])
-    tor_wrapper_process = stem.process.launch_tor_with_config(
+    wrapper_process = stem.process.launch_tor_with_config(
         tor_config,
         tor_cmd=os.path.join('/usr/share', PROGRAM_NAME, 'tor-stdout-fix.py'),
         init_msg_handler=print_bootstrap_lines)
 
-    return tor_wrapper_process
+    return wrapper_process
 
 
 def start_tor_before_daemonize(config):
@@ -307,10 +307,10 @@ def start_tor_before_daemonize(config):
     config: The program configuration object, mostly based on the configuration file.
     Returns a handle to the Tor wrapper process.
     """
-    tor_wrapper_process = None
+    wrapper_process = None
     start_time = datetime.datetime.now()
     try:
-        tor_wrapper_process = start_tor(config)
+        wrapper_process = start_tor(config)
     except OSError as os_error:
         end_time = datetime.datetime.now()
         fail_time = end_time - start_time
@@ -327,52 +327,52 @@ def start_tor_before_daemonize(config):
                 'Tor failed to start in only %d seconds. Assuming the program is '
                 'misconfigured. Quitting.' % fail_time.total_seconds()) from os_error
 
-    return tor_wrapper_process
+    return wrapper_process
 
 
-def is_tor_wrapper_process_running(tor_wrapper_process):
+def is_tor_wrapper_process_running(wrapper_process):
     """Checks if the Tor wrapper process is still running. Popen.poll() does not work when a
     subprocess is started before Daemonize, so this method uses an alternate algorithm to
     determine is if the subprocess is still running. This method sends USR1 to the
     subprocess. If a ProcessLookupError is raised, the subprocess is no longer running.
 
-    tor_wrapper_process: A handle to the Tor wrapper process.
+    wrapper_process: A handle to the Tor wrapper process.
     Returns True if the subprocess is still running. False otherwise.
     """
     running = True
     try:
-        tor_wrapper_process.send_signal(signal.SIGUSR1)
+        wrapper_process.send_signal(signal.SIGUSR1)
     except ProcessLookupError:
         running = False
 
     return running
 
 
-def restart_tor_if_needed(config, tor_wrapper_process):
+def restart_tor_if_needed(config, wrapper_process):
     """If Tor hasn't started or has stopped running, try to connect.
 
     config: The program configuration object, mostly based on the configuration file.
-    tor_wrapper_process: A handle to the Tor wrapper process.
+    wrapper_process: A handle to the Tor wrapper process.
     Returns a handle to the current Tor wrapper process. Might be a different handle than
       the parameter above.
     """
-    while tor_wrapper_process is None or not is_tor_wrapper_process_running(
-            tor_wrapper_process):
-        if tor_wrapper_process is not None:
+    while wrapper_process is None or not is_tor_wrapper_process_running(
+            wrapper_process):
+        if wrapper_process is not None:
             logger.error(
                 'Tor process unexpectantly exited with exit code %d. Attempting to restart '
-                'Tor.', tor_wrapper_process.returncode)
+                'Tor.', wrapper_process.returncode)
         try:
-            tor_wrapper_process = start_tor(config)
+            wrapper_process = start_tor(config)
         except Exception as exception:
-            tor_wrapper_process = None
+            wrapper_process = None
             logger.error(
                 'Failed to start Tor. %s: %s\n%s\nWill try to connect again in 1 second.',
                 type(exception).__name__, str(exception),
                 traceback.format_exc())
             time.sleep(1)
 
-    return tor_wrapper_process
+    return wrapper_process
 
 
 def get_url_availability(url):
@@ -441,15 +441,15 @@ def check_availability_and_send_notification(config, prior_availability):
     return current_availability
 
 
-def main_loop(config, tor_wrapper_process):
+def main_loop(config):
     """The main program loop.
 
     config: The program configuration object, mostly based on the configuration file.
-    tor_wrapper_process: A handle to the Tor wrapper process.
     """
     # Uses /dev/urandom, for determining how long to sleep the main loop.
     random.SystemRandom()
 
+    global tor_wrapper_process
     prior_availability = True  # Start the program assuming the website is up.
 
     logger.trace('Starting main loop.')
@@ -512,9 +512,9 @@ def main():
 
         logger.info('Daemonizing...')
         with daemon_context:
-            main_loop(config, tor_wrapper_process)
+            main_loop(config)
 
-    except Exception as exception:
+    except (Exception, KeyboardInterrupt) as exception:
         logger.critical('Fatal %s: %s\n%s', type(exception).__name__, str(exception),
                         traceback.format_exc())
         stop_tor_before_exit(tor_wrapper_process)
