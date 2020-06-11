@@ -220,10 +220,17 @@ def stop_tor_before_exit(wrapper_process):
         logger.info('Waiting for one second for Tor to terminate.')
         wrapper_process.terminate()
         time.sleep(1)
-        if wrapper_process.poll() is None:
+        if is_tor_wrapper_process_running(wrapper_process):
             logger.error('Tor process did not terminate. Attempting to kill tor.')
             # Since Tor is linked to the wrapper process, Tor should quickly self terminate.
             wrapper_process.kill()
+            # To handle the case where the daemon is restarting, make sure the Tor process
+            #   has had enough time to realize the Tor wrapper process has died. Tor polls
+            #   every 15 seconds to determine if its owning contoller process has died. If
+            #   we don't wait, the Tor port might still be in use.
+            logger.error('Waiting for 16 seconds for the Tor process to realize that the '
+                'wrapper process has died.')
+            time.sleep(16)
 
 
 def sig_term_handler(signal, stack_frame):  #pylint: disable=unused-argument

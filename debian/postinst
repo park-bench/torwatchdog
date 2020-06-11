@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# Copyright 2015-2016 Joel Allen Luellwitz and Emily Frost
+# Copyright 2015-2020 Joel Allen Luellwitz and Emily Frost
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -47,4 +47,4 @@ case "$1" in
 esac
 
 update-rc.d torwatchdog defaults || exit 1
-invoke-rc.d torwatchdog start || exit 1
+systemctl restart torwatchdog || exit 1
