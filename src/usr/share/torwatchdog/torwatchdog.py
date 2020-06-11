@@ -135,8 +135,8 @@ def read_configuration_and_create_logger(program_uid, program_gid):
     config['url'] = config_helper.verify_string_exists(config_file, 'url')
     config['tor_socks_port'] = config_helper.verify_integer_within_range(
         config_file, 'tor_socks_port', lower_bound=1, upper_bound=65536)
-    config['average_delay'] = config_helper.verify_number_within_range(
-        config_file, 'average_delay', lower_bound=0.000001)
+    config['max_poll_delay'] = config_helper.verify_number_within_range(
+        config_file, 'max_poll_delay', lower_bound=0.000001)
     config['email_subject'] = config_helper.get_string_if_exists(
         config_file, 'email_subject')
 
@@ -211,6 +211,24 @@ def configure_tor_proxy(config):
         socket.AF_INET, socket.SOCK_STREAM, 6, '', (args[0], args[1]))]
 
 
+def is_tor_wrapper_process_running(wrapper_process):
+    """Checks if the Tor wrapper process is still running. Popen.poll() does not work when a
+    subprocess is started before Daemonize, so this method uses an alternate algorithm to
+    determine is if the subprocess is still running. This method sends USR1 to the
+    subprocess. If a ProcessLookupError is raised, the subprocess is no longer running.
+
+    wrapper_process: A handle to the Tor wrapper process.
+    Returns True if the subprocess is still running. False otherwise.
+    """
+    running = True
+    try:
+        wrapper_process.send_signal(signal.SIGUSR1)
+    except ProcessLookupError:
+        running = False
+
+    return running
+
+
 def stop_tor_before_exit(wrapper_process):
     """Stops the Tor wrapper, first by being nice and using SIGTERM and then SIGKILL.
 
@@ -220,7 +238,9 @@ def stop_tor_before_exit(wrapper_process):
         logger.info('Waiting for one second for Tor to terminate.')
         wrapper_process.terminate()
         time.sleep(1)
-        if is_tor_wrapper_process_running(wrapper_process):
+        if not is_tor_wrapper_process_running(wrapper_process):
+            logger.info('Tor stopped successfully.')
+        else:
             logger.error('Tor process did not terminate. Attempting to kill tor.')
             # Since Tor is linked to the wrapper process, Tor should quickly self terminate.
             wrapper_process.kill()
@@ -337,24 +357,6 @@ def start_tor_before_daemonize(config):
     return wrapper_process
 
 
-def is_tor_wrapper_process_running(wrapper_process):
-    """Checks if the Tor wrapper process is still running. Popen.poll() does not work when a
-    subprocess is started before Daemonize, so this method uses an alternate algorithm to
-    determine is if the subprocess is still running. This method sends USR1 to the
-    subprocess. If a ProcessLookupError is raised, the subprocess is no longer running.
-
-    wrapper_process: A handle to the Tor wrapper process.
-    Returns True if the subprocess is still running. False otherwise.
-    """
-    running = True
-    try:
-        wrapper_process.send_signal(signal.SIGUSR1)
-    except ProcessLookupError:
-        running = False
-
-    return running
-
-
 def restart_tor_if_needed(config, wrapper_process):
     """If Tor hasn't started or has stopped running, try to connect.
 
@@ -466,7 +468,7 @@ def main_loop(config):
 
             # Let's not be too obvious about what this program does. Ramdomize the time
             #   between availability checks.
-            sleep_seconds = random.uniform(0, float(config['average_delay']))
+            sleep_seconds = random.uniform(0, float(config['max_poll_delay']))
             logger.trace('Sleeping for %d seconds.' % sleep_seconds)
             time.sleep(sleep_seconds)
 
