@@ -1,6 +1,6 @@
 #! /bin/sh
 
-# Copyright 2015-2019 Joel Allen Luellwitz and Emily Frost
+# Copyright 2015-2020 Joel Allen Luellwitz and Emily Frost
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -17,8 +17,8 @@
 
 ### BEGIN INIT INFO
 # Provides:          torwatchdog
-# Required-Start:    $remote_fs $syslog gpgmailer
-# Required-Stop:     $remote_fs $syslog gpgmailer
+# Required-Start:    $remote_fs $syslog gpgmailer tor
+# Required-Stop:     $remote_fs $syslog gpgmailer tor
 # Default-Start:     2 3 4 5
 # Default-Stop:      0 1 6
 # Short-Description: Tor Hidden Service Watchdog
