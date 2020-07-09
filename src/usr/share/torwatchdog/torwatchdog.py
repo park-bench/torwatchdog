@@ -54,8 +54,6 @@ PROGRAM_PID_DIRS = PROGRAM_NAME
 PID_FILE = '%s.pid' % PROGRAM_NAME
 LOG_DIR = os.path.join('/var/log', PROGRAM_NAME)
 LOG_FILE = '%s.log' % PROGRAM_NAME
-SYSTEM_DATA_DIR = '/var/cache'
-TOR_DATA_DIRS = os.path.join(PROGRAM_NAME, 'tor')
 PROCESS_USERNAME = PROGRAM_NAME
 PROCESS_GROUP_NAME = PROGRAM_NAME
 PROGRAM_UMASK = 0o027  # -rw-r----- and drwxr-x---
@@ -367,11 +365,6 @@ def main():
         # Non-root users cannot create files in /run, so create a directory that can be
         #   written to. Full access to user only.  drwx------ torwatchdog torwatchdog
         create_directory(SYSTEM_PID_DIR, PROGRAM_PID_DIRS, program_uid, program_gid,
-                         stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
-
-        # Make the Tor data directory. Full access to user only.
-        #   drwx------ torwatchdog torwatchdog
-        create_directory(SYSTEM_DATA_DIR, TOR_DATA_DIRS, program_uid, program_gid,
                          stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
 
         # Configuration has been read and directories setup. Now drop permissions forever.

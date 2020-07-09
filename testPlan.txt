@@ -1,0 +1,152 @@
+* Test the init.d script:
+  * Exit if daemon program is not installed.
+  * Source the /etc/default/torwatchdog file if it exists.
+  * /lib/init/vars.sh is sourced.
+  * /lib/lsb/init-functions is sourced.
+  * starts after tor
+  * start
+    * Returns 0 if started.
+      * Verbose message works
+    * Returns 1 if already running when started.
+      * Verbose message works
+    * Returns 2 on failure.
+      * Verbose message works
+  * stop
+    * PID file removed
+    * Returns 0 if stopped.
+      * Verbose message works
+    * Returns 1 is already stopped.
+      * Verbose message works
+    * Returns 2 if program cannot be stopped (stub out the start-stop-daemon program [restore before rebooting]).
+      * Verbose message works
+  * status
+    * Returns 0 on success.
+    * Returns something else on failure.
+  * restart
+    * Starts when not running.
+    * restarts when running.
+    * prints success verbose message
+    * prints warning verbose message one old process still running.
+    * prints warning on failed to start.
+    * prints warning on failed to stop.
+  * force-reload
+    * Same as restart.
+  * anything else prints usage
+* Following the instructions results in a working application.
+* The torwatchdog group is created if it doesn't exist.
+* The torwatchdog group already exists.
+* The torwatchdog user is created if it doesn't exist.
+* The torwatchdog user already exists.
+* The torwatchdog user has the 2 correct groups.
+* The tor@torwatchdogtor instance is created if it doesn't exist.
+  * The socks port is set.
+* The tor@torwatchdogtor already exists.
+  * The socks port is unchanged.
+* tor is started following install.
+* torwatchdog is started following install.
+* tor is enabled following install.
+* torwatchdog is enabled following install.
+* Reinstalling does NOT restart tor@torwatchdogtor.
+* Reinstalling does restart torwatchdog.
+* Reinstalling enables tor@torwatchdogtor.
+* Reinstalling enables torwatchdog.
+* Verify the config matches the example.
+* Verify the license is installed.
+* Test starting when the torwatchdog user does not exist.
+* Test starting when the torwatchdog group does not exist.
+* Configuration file missing.
+* log_level setting missing.
+* log_level setting empty.
+* Log directory gets created if it doesn't exist.
+  * Permissions are correct on /var/log/torwatchdog/torwatchdog.log
+    * Owner and group
+    * Permission bits
+  * Permissions are correct on /var/log/torwatchdog/
+    * Owner and group
+    * Permission bits
+* Log directory already exists.
+  * Permissions are correct on /var/log/torwatchdog/torwatchdog.log
+    * Owner and group
+    * Permission bits
+  * Permissions are correct on /var/log/torwatchdog/
+    * Owner and group
+    * Permission bits
+* Process is owned by torwatchdog after log file creation.
+* Process egid is torwatchdog after log file creation.
+* url does not exist
+* url is blank
+* tor_socks_port does not exist
+* tor_socks_port is blank
+* tor_socks_port is 0
+* tor_socks_port is 1
+* tor_socks_port is 65535
+* tor_socks_port is 65536
+* max_poll_delay does not exist
+* max_poll_delay is blank
+* max_poll_delay is less than  0.000001
+* max_poll_delay is equal to 0.000001
+* email_subject does not exist
+* email_subject is blank
+* email_subject does exist
+* configuration file is not owned by root.
+* configuration file's other permissions are wrong.
+  * x
+  * r
+  * w
+* Run directory gets created if it doesn't exist.
+  * Permissions are correct on /run/torwatchdog/torwatchdog.log
+    * Owner and group
+    * Permission bits
+  * Permissions are correct on /run/torwatchdog/
+    * Owner and group
+    * Permission bits
+* Run directory already exists.
+  * Permissions are correct on /run/torwatchdog/torwatchdog.log
+    * Owner and group
+    * Permission bits
+  * Permissions are correct on /run/torwatchdog/
+    * Owner and group
+    * Permission bits
+* Once permissions are dropped, the gid cannot be changed.
+* Once permissions are dropped, the uid cannot be changed.
+* The program has the correct groups after permissions are dropped.
+* The tor proxy cannot be accessed externally.
+* The program quits gracefully on sigterm.
+* The pid file gets created.
+  * The pid file has the right ownership.
+  * The pid file has the right permission bits.
+  * The pid file contains the correct process number.
+* Before daemonize program's umask is set correctly.
+  * Test file creation.
+  * Test directory creation.
+* After daemonize program's umask is set correctly.
+  * Test file creation.
+  * Test directory creation.
+* After deamonize, the program has the correct uid.
+* After daemonize, the program has the correct gid.
+* After daemonize, the uid cannot be changed.
+* After daemonize, the gid cannot be changed.
+* The site is up.
+  * Notification sent.
+    * Looks OK when received.
+  * Message logged.
+* The site is down.
+  * Notification set.
+    * Looks OK when received.
+  * Message logged.
+* No message sent if site is up when program starts.
+* Message sent if program starts when site is down.
+  * Looks OK when received.
+* Log error if message fails to queue.
+* State can accurately toggle between available and unavailable.
+* The requests are actually randomly distributed.
+  * The requests are less than the maximum delay.
+* An exception doesn't kill the program once the main loop is entered.
+* The program can access onion URLs.
+* The program can access regular HTTPS URLs.
+* The program isn't leaking DNS queries.
+* The stack trace is printed if an exception occurs before the main loop.
+* Test the keyboard exception (by starting the program outside of systemd).
+* On removal, the torwatchdog process is stopped.
+* On removal, the tor@torwatchdogtor process is stopped.
+* On removal, the tor@torwatchdogtor process is disabled.

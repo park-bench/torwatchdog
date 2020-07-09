@@ -53,7 +53,7 @@ case "$1" in
     ;;
 esac
 
-systemctl enable tor
-systemctl restart tor
+systemctl enable tor || exit 1
+systemctl start tor || exit 1
 update-rc.d torwatchdog defaults || exit 1
 systemctl restart torwatchdog || exit 1

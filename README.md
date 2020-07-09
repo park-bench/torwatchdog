@@ -1,7 +1,8 @@
 # torwatchdog
 
 _torwatchdog_ is a daemon that checks the availability of an arbitrary URL through Tor and
-sends encrypted notification emails using our gpgmailer daemon when the availability changes.
+sends encrypted notification emails using our gpgmailer daemon when the URL availability
+changes.
 
 _torwatchdog_ is licensed under the GNU GPLv3.
 
@@ -18,7 +19,6 @@ installing a Debian package. The rest of these instructions make the following a
 *   You are familiar with using a Linux terminal.
 *   You are somewhat familiar with using `debuild`.
 *   `debhelper` is installed.
-*   You are familiar with GnuPG.
 
 **NOTICE:** Some distributions, including Ubuntu, do not maintain a secure and updated
 version of Tor. Please manually add the Tor Project's Apt repository. Instructions are
@@ -42,8 +42,7 @@ _torwatchdog_ depends on two other Parkbench projects which must be installed fi
 2.  Clone the repository and checkout the lastest release tag. (Do not build against the
     `master` branch. The `master` branch might not be stable.)
 3.  Use `debuild` in the project root directory to build the package.
-4.  Use `dpkg -i` to install the package.
-5.  Run `apt-get -f install` to resolve any missing dependencies. The daemon will attempt to
+5.  Run `apt install /path/to/package.deb` to install the package. The daemon will attempt to
     start and fail. (This is expected.)
 6.  Copy or rename the example configuration file
     `/etc/torwatchdog/torwatchdog.conf.example` to `/etc/torwatchdog/torwatchdog.conf`. Edit
@@ -58,6 +57,9 @@ chmod u=rw,g=r,o= /etc/torwatchdog/torwatchdog.conf
 9.  Restart the daemon with `systemctl restart torwatchdog`. If the configuration file is
     valid, named correctly, and has the correct file permissions, the service will start
     successfully.
+
+If the default TCP port of 6613 is in use, alter the port specified in
+`/etc/torwatchdog/torwatchdog.conf` and `/etc/tor/instances/torwatchdogtor/torrc`.
 
 ## Updates
 

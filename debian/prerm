@@ -16,3 +16,5 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 invoke-rc.d torwatchdog stop || exit 1
+systemctl stop tor@torwatchdogtor || exit 1
+systemctl disable tor@torwatchdogtor || exit 1
