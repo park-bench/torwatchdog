@@ -40,8 +40,7 @@ _torwatchdog_ depends on two other Parkbench projects which must be installed fi
     start and fail. (This is expected.)
 6.  Copy or rename the example configuration file
     `/etc/torwatchdog/torwatchdog.conf.example` to `/etc/torwatchdog/torwatchdog.conf`. Edit
-    this file to enter the Tor URL that should be monitored. Other settings can also be
-    modified.
+    this file to enter the URL that should be monitored. Other settings can also be modified.
 7.  Change the ownership and permissions of the configuration file:
 ```
 chown root:torwatchdog /etc/torwatchdog/torwatchdog.conf
