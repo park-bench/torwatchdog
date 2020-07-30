@@ -20,13 +20,6 @@ installing a Debian package. The rest of these instructions make the following a
 *   You are somewhat familiar with using `debuild`.
 *   `debhelper` is installed.
 
-**NOTICE:** Some distributions, including Ubuntu, do not maintain a secure and updated
-version of Tor. Please manually add the Tor Project's Apt repository. Instructions are
-here: https://www.torproject.org/docs/debian.html.en
-
-At the time of this writing, the Tor Project's signing key for Apt packages
-is: A3C4 F0F9 79CA A22C DBA8  F512 EE8C BC9E 886D DD89
-
 ## Parkbench Dependencies
 
 _torwatchdog_ depends on two other Parkbench projects which must be installed first:
@@ -36,17 +29,19 @@ _torwatchdog_ depends on two other Parkbench projects which must be installed fi
 
 ## Steps to Build and Install
 
-1.  Manually add the Tor Project's Apt repository to ensure you have a secure and updated
-    version of Tor. Instructions located here:
-    https://www.torproject.org/docs/debian.html.en
+1.  Install 'tor' and the 'deb.torproject.org-keyring' by following the Tor Project's
+    instructions located here: https://www.torproject.org/docs/debian.html.en At the time of
+    this writing, the Tor Project's signing key for Apt packages is:
+    A3C4 F0F9 79CA A22C DBA8  F512 EE8C BC9E 886D DD89
 2.  Clone the repository and checkout the lastest release tag. (Do not build against the
     `master` branch. The `master` branch might not be stable.)
-3.  Use `debuild` in the project root directory to build the package.
+3.  Run `debuild` in the project root directory to build the package.
 5.  Run `apt install /path/to/package.deb` to install the package. The daemon will attempt to
     start and fail. (This is expected.)
 6.  Copy or rename the example configuration file
     `/etc/torwatchdog/torwatchdog.conf.example` to `/etc/torwatchdog/torwatchdog.conf`. Edit
-    this file to enter the Tor URL you want to monitor. Other settings can also be modified.
+    this file to enter the Tor URL that should be monitored. Other settings can also be
+    modified.
 7.  Change the ownership and permissions of the configuration file:
 ```
 chown root:torwatchdog /etc/torwatchdog/torwatchdog.conf

@@ -1,24 +1,18 @@
+* Can build following the instructions.
 * Test the init.d script:
   * Exit if daemon program is not installed.
   * Source the /etc/default/torwatchdog file if it exists.
   * /lib/init/vars.sh is sourced.
-  * /lib/lsb/init-functions is sourced.
   * starts after tor
   * start
-    * Returns 0 if started.
-      * Verbose message works
-    * Returns 1 if already running when started.
-      * Verbose message works
-    * Returns 2 on failure.
-      * Verbose message works
+    * Returns $VERBOSE message when started.
+    * Returns $VERBOSE message if already running when started.
+    * Returns $VERBOSE messgae on failure.
   * stop
     * PID file removed
-    * Returns 0 if stopped.
-      * Verbose message works
-    * Returns 1 is already stopped.
-      * Verbose message works
-    * Returns 2 if program cannot be stopped (stub out the start-stop-daemon program [restore before rebooting]).
-      * Verbose message works
+    * Returns $VERBOSE message when stopped.
+    * Returns $VERBOSE message when already stopped.
+    * Returns $VERBOSE message if program cannot be stopped (stub out the start-stop-daemon program [restore before rebooting]).
   * status
     * Returns 0 on success.
     * Returns something else on failure.
@@ -150,3 +144,4 @@
 * On removal, the torwatchdog process is stopped.
 * On removal, the tor@torwatchdogtor process is stopped.
 * On removal, the tor@torwatchdogtor process is disabled.
+* Programs starts fine with default values (as much as possible) in a VM.
