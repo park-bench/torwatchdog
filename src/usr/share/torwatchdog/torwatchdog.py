@@ -93,7 +93,10 @@ def read_configuration_and_create_logger(program_uid, program_gid):
     program_gid: The system group ID this program should drop to before daemonization.
     Returns the read system config, a confighelper instance, and a logger instance.
     """
-    print('Reading %s...' % CONFIGURATION_PATHNAME)
+    # TODO: Look into defaulting the logging to the console until the program gets more
+    #   bootstrapped. Flush stdout for right now so that messages log in the correct order.
+    #   (gpgmailer issue 18)
+    print('Reading %s...' % CONFIGURATION_PATHNAME, flush=True)
 
     if not os.path.isfile(CONFIGURATION_PATHNAME):
         raise InitializationException(
@@ -110,9 +113,7 @@ def read_configuration_and_create_logger(program_uid, program_gid):
 
     # Create logging directory.  drwxr-x--- torwatchdog torwatchdog
     log_mode = stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IRGRP | stat.S_IXGRP
-    # TODO: Look into defaulting the logging to the console until the program gets more
-    #   bootstrapped. (gpgmailer issue 18)
-    print('Creating logging directory %s.' % LOG_DIR)
+    print('Creating logging directory %s.' % LOG_DIR, flush=True)
     if not os.path.isdir(LOG_DIR):
         # Will throw exception if directory cannot be created.
         os.makedirs(LOG_DIR, log_mode)
@@ -120,7 +121,7 @@ def read_configuration_and_create_logger(program_uid, program_gid):
     os.chmod(LOG_DIR, log_mode)
 
     # Temporarily drop permissions and create the handle to the logger.
-    print('Configuring logger.')
+    print('Configuring logger.', flush=True)
     os.setegid(program_gid)
     os.seteuid(program_uid)
     config_helper.configure_logger(os.path.join(LOG_DIR, LOG_FILE), config['log_level'])

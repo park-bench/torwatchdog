@@ -7,7 +7,6 @@ torwatchdog (0.8) UNRELEASED; urgency=medium
   [ eviljoel]
   * Tor runs in its down daemon process.
   * Daemon runs as its own user.
-  * Relies on a Tor daemon process.
 
  -- Emily Frost <emfrost@posteo.net>  Mon, 27 Nov 2017 20:35:52 -0600
 

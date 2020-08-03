@@ -46,6 +46,7 @@
 * Reinstalling enables torwatchdog.
 * Verify the config matches the example.
 * Verify the license is installed.
+* Verify changelog is sufficiently updated.
 * Test starting when the torwatchdog user does not exist.
 * Test starting when the torwatchdog group does not exist.
 * Configuration file missing.
