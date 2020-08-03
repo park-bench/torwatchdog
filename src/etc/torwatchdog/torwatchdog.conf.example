@@ -10,7 +10,8 @@ log_level=info
 # The URL that torwatchdog checks.
 url=
 
-# Tor will listen on this port. (Default randomly chosen by developer.)
+# Tor will listen on this port. (Default randomly chosen by developer.) This value must match
+#   the value in /etc/tor/instances/torwatchdogtor/torrc.
 tor_socks_port=6613
 
 # Maximum delay in seconds between URL polling attempts. The delay between URL polling
