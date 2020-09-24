@@ -12,16 +12,14 @@
     * PID file removed
     * Returns $VERBOSE message when stopped.
     * Returns $VERBOSE message when already stopped.
-    * Returns $VERBOSE message if program cannot be stopped (stub out the start-stop-daemon program [restore before rebooting]).
-  * status
-    * Returns 0 on success.
-    * Returns something else on failure.
+    * Returns warning message if program cannot be stopped (stub out the start-stop-daemon program [restore before rebooting]).
+  * status prints status
   * restart
     * Starts when not running.
     * restarts when running.
-    * prints success verbose message
-    * prints warning verbose message one old process still running.
-    * prints warning on failed to start.
+    * prints $VERBOSE message on restart
+    * prints $VERBOSE message when old process still running.
+    * prints $VERBOSE message on failed to start.
     * prints warning on failed to stop.
   * force-reload
     * Same as restart.
@@ -40,7 +38,7 @@
 * torwatchdog is started following install.
 * tor is enabled following install.
 * torwatchdog is enabled following install.
-* Reinstalling does NOT restart tor@torwatchdogtor.
+* tor@torwatchdogtor is always running following reinstall.
 * Reinstalling does restart torwatchdog.
 * Reinstalling enables tor@torwatchdogtor.
 * Reinstalling enables torwatchdog.
@@ -66,7 +64,7 @@
   * Permissions are correct on /var/log/torwatchdog/
     * Owner and group
     * Permission bits
-* Process is owned by torwatchdog after log file creation.
+* Process eoid is torwatchdog after log file creation.
 * Process egid is torwatchdog after log file creation.
 * url does not exist
 * url is blank
@@ -84,43 +82,42 @@
 * email_subject is blank
 * email_subject does exist
 * configuration file is not owned by root.
+* configuration file has group write permission.
 * configuration file's other permissions are wrong.
   * x
   * r
   * w
 * Run directory gets created if it doesn't exist.
-  * Permissions are correct on /run/torwatchdog/torwatchdog.log
+  * Permissions are correct on /run/torwatchdog/torwatchdog.pid
     * Owner and group
     * Permission bits
   * Permissions are correct on /run/torwatchdog/
     * Owner and group
     * Permission bits
 * Run directory already exists.
-  * Permissions are correct on /run/torwatchdog/torwatchdog.log
+  * Permissions are correct on /run/torwatchdog/torwatchdog.pid
     * Owner and group
     * Permission bits
   * Permissions are correct on /run/torwatchdog/
     * Owner and group
     * Permission bits
-* Once permissions are dropped, the gid cannot be changed.
-* Once permissions are dropped, the uid cannot be changed.
+* Once permissions are dropped, the egid cannot be changed.
+* Once permissions are dropped, the euid cannot be changed.
 * The program has the correct groups after permissions are dropped.
 * The tor proxy cannot be accessed externally.
 * The program quits gracefully on sigterm.
-* The pid file gets created.
-  * The pid file has the right ownership.
-  * The pid file has the right permission bits.
-  * The pid file contains the correct process number.
+* The pid file contains the correct process number.
 * Before daemonize program's umask is set correctly.
   * Test file creation.
   * Test directory creation.
 * After daemonize program's umask is set correctly.
   * Test file creation.
   * Test directory creation.
-* After deamonize, the program has the correct uid.
-* After daemonize, the program has the correct gid.
-* After daemonize, the uid cannot be changed.
-* After daemonize, the gid cannot be changed.
+* After deamonize, the program have a blank ouid.
+* After deamonize, the program should have an suid, euid, and ruid of torwatchdog.
+* After deamonize, the program should have an sgid, egid, and rgid of torwatchdog.
+* After daemonize, the euid cannot be changed.
+* After daemonize, the egid cannot be changed.
 * The site is up.
   * Notification sent.
     * Looks OK when received.
@@ -131,7 +128,6 @@
   * Message logged.
 * No message sent if site is up when program starts.
 * Message sent if program starts when site is down.
-  * Looks OK when received.
 * Log error if message fails to queue.
 * State can accurately toggle between available and unavailable.
 * The requests are actually randomly distributed.
@@ -143,6 +139,7 @@
 * The stack trace is printed if an exception occurs before the main loop.
 * Test the keyboard exception (by starting the program outside of systemd).
 * On removal, the torwatchdog process is stopped.
+* On removal, the torwatchdog process is disabled.
 * On removal, the tor@torwatchdogtor process is stopped.
 * On removal, the tor@torwatchdogtor process is disabled.
 * Programs starts fine with default values (as much as possible) in a VM.
