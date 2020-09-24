@@ -18,7 +18,7 @@ installing a Debian package. The rest of these instructions make the following a
 
 *   You are familiar with using a Linux terminal.
 *   You are somewhat familiar with using `debuild`.
-*   `debhelper` is installed.
+*   `debhelper` and `devscripts` are installed.
 
 ## Parkbench Dependencies
 
