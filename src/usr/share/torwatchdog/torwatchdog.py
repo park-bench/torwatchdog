@@ -151,6 +151,10 @@ def verify_safe_file_permissions():
     if config_file_stat.st_uid != 0:
         raise InitializationException(
             'File %s must be owned by root.' % CONFIGURATION_PATHNAME)
+    if bool(config_file_stat.st_mode & stat.S_IWGRP):
+        raise InitializationException(
+            "File %s cannot be writable via the group access permission."
+            % CONFIGURATION_PATHNAME)
     if bool(config_file_stat.st_mode & (stat.S_IROTH | stat.S_IWOTH | stat.S_IXOTH)):
         raise InitializationException(
             "File %s cannot have 'other user' access permissions set."
@@ -333,7 +337,7 @@ def main_loop(config):
             # Let's not be too obvious about what this program does. Ramdomize the time
             #   between availability checks.
             sleep_seconds = random.uniform(0, float(config['max_poll_delay']))
-            logger.trace('Sleeping for %d seconds.' % sleep_seconds)
+            logger.trace('Sleeping for %f seconds.' % sleep_seconds)
             time.sleep(sleep_seconds)
 
             prior_availability = check_availability_and_send_notification(
