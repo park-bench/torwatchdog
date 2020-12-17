@@ -42,16 +42,17 @@ torwatchdog depends on two other Parkbench packages, which must be installed fir
 4.  Run `apt install /path/to/package.deb` to install the package. The daemon will attempt to
     start and fail. (This is expected.)
 5.  Copy or rename the example configuration file
-    `/etc/torwatchdog/torwatchdog.conf.example` to `/etc/torwatchdog/torwatchdog.conf`. Edit
-    this file to enter the URL that should be monitored. Other settings can also be modified.
+    `/etc/torwatchdog/torwatchdog.conf.example` to `/etc/torwatchdog/torwatchdog.conf`.
 6.  Change the ownership and permissions of the configuration file:
 ```
 chown root:torwatchdog /etc/torwatchdog/torwatchdog.conf
 chmod u=rw,g=r,o= /etc/torwatchdog/torwatchdog.conf
 ```
-7.  To ease system maintenance, add `torwatchdog` as a supplemental group to administrative
+7.  Edit `/etc/torwatchdog/torwatchdog.conf` to enter the URL that should be monitored. Other
+    settings can also be modified.
+8.  To ease system maintenance, add `torwatchdog` as a supplemental group to administrative
     users. Doing this will allow these users to view torwatchdog log files.
-8.  Restart the daemon with `systemctl restart torwatchdog`. If the configuration file is
+9.  Restart the daemon with `systemctl restart torwatchdog`. If the configuration file is
     valid, named correctly, and has the correct file permissions, the service will start
     successfully.
 
