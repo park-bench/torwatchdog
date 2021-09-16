@@ -64,8 +64,8 @@
   * Permissions are correct on /var/log/torwatchdog/
     * Owner and group
     * Permission bits
-* Process eoid is torwatchdog after log file creation.
-* Process egid is torwatchdog after log file creation.
+* Process eoid is torwatchdog after log directory creation.
+* Process egid is torwatchdog after log directory creation.
 * url does not exist
 * url is blank
 * tor_socks_port does not exist
@@ -106,6 +106,7 @@
 * The program has the correct groups after permissions are dropped.
 * The tor proxy cannot be accessed externally.
 * The program quits gracefully on sigterm.
+* After daemonize, the current working directory is '/'.
 * The pid file contains the correct process number.
 * Before daemonize program's umask is set correctly.
   * Test file creation.
@@ -143,3 +144,5 @@
 * On removal, the tor@torwatchdogtor process is stopped.
 * On removal, the tor@torwatchdogtor process is disabled.
 * Programs starts fine with default values (as much as possible) in a VM.
+* Termination Signal.
+  * Logs info message and quits.
