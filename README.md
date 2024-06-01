@@ -33,8 +33,8 @@ torwatchdog depends on two other Parkbench packages, which must be installed fir
 ## Steps to Build and Install
 
 1.  Install 'tor' and the 'deb.torproject.org-keyring' by following the Tor Project's
-    instructions located here: https://www.torproject.org/docs/debian.html.en At the time of
-    this writing, the Tor Project's signing key for Apt packages is:
+    instructions located here: https://support.torproject.org/apt/ At the time of this
+    writing, the Tor Project's signing key for Apt packages is:
     A3C4 F0F9 79CA A22C DBA8  F512 EE8C BC9E 886D DD89
 2.  Clone the repository and checkout the latest release tag. (Do not build against the
     `master` branch. The `master` branch might not be stable.)
