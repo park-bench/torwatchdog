@@ -1,0 +1,74 @@
+[Unit]
+Description=Tor Hidden Service Watchdog
+Documentation=https://park-bench.github.io/ https://github.com/park-bench/torwatchdog
+After=gpgmailer.service
+Wants=gpgmailer.service
+StartLimitIntervalSec=1
+StartLimitBurst=3
+
+[Service]
+UMask=0027
+User=torwatchdog
+Group=torwatchdog
+Type=notify
+Restart=always
+WatchdogSec=935
+TimeoutStartSec=1
+TimeoutStopSec=1
+ExecStart=/usr/share/torwatchdog/torwatchdog.py
+OOMPolicy=continue
+# Not available in current systemd: OpenFile=/etc/torwatchdog/torwatchdog.conf:config:read-only
+# TODO: See if you can remove the need for SupplementaryGroups.
+SupplementaryGroups=torwatchdog
+# Not available in current systemd: SetLoginEnvironment=false
+NoNewPrivileges=true
+SecureBits=keep-caps-locked no-setuid-fixup no-setuid-fixup-locked noroot noroot-locked
+WorkingDirectory=/
+KillMode=mixed
+ProtectSystem=strict
+TemporaryFileSystem=/etc:ro
+BindReadOnlyPaths=/etc/torwatchdog
+BindReadOnlyPaths=/etc/group
+BindReadOnlyPaths=/etc/ld.so.cache
+BindReadOnlyPaths=/etc/ld.so.conf
+BindReadOnlyPaths=/etc/ld.so.conf.d
+BindReadOnlyPaths=/etc/passwd
+BindPaths=/var/run
+TemporaryFileSystem=/home:ro
+TemporaryFileSystem=/media:ro
+TemporaryFileSystem=/opt:ro
+TemporaryFileSystem=/snap:ro
+TemporaryFileSystem=/sys:ro
+TemporaryFileSystem=/var:ro
+BindPaths=/var/spool/gpgmailer
+ReadWritePaths=/var/spool/gpgmailer/outbox /var/spool/gpgmailer/partial
+PrivateTmp=True
+PrivateDevices=True
+PrivateNetwork=True
+PrivateIPC=True
+# TODO: Not available in current systemd: PrivatePIDs=True
+# TODO: Enable?: PrivateUsers=
+ProtectHostname=True
+ProtectClock=True
+ProtectKernelTunables=True
+ProtectKernelModules=True
+ProtectKernelLogs=True
+# Current version does not support strict: ProtectControlGroups=strict
+RestrictAddressFamilies=AF_INET AF_UNIX
+IPAddressAllow=127.0.0.1
+SystemCallArchitectures=native
+RestrictNamespaces=True
+LockPersonality=True
+MemoryDenyWriteExecute=True
+RestrictRealtime=True
+RestrictSUIDSGID=True
+RemoveIPC=True
+SystemCallFilter=~@clock @cpu-emulation @keyring @mount @privileged @reboot @setuid @swap @sync
+StandardOutput=journal
+StandardError=journal
+LogNamespace=parkbench
+# TODO: For gpgmailer, consider using LoadCredentialEncrypted=ID[:PATH]
+SystemCallErrorNumber=EPERM
+
+[Install]
+WantedBy=multi-user.target

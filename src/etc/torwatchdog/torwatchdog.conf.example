@@ -15,8 +15,13 @@ url=
 tor_socks_port=6613
 
 # Maximum delay in seconds between URL polling attempts. The delay between URL polling
-#   attempts (in seconds) is randomly selected between 0 and this value.
+#   attempts (in seconds) is randomly selected between 0 and this value. Cannot be greater
+#   than 900.
 max_poll_delay=300
+
+# The minimum number of subsequent failed polls before the email alert is sent. Must be 1 or
+#   greater.
+min_failed_polls=3
 
 # Optional subject line, an arbitary string. Subject lines are NOT encrypted.
 email_subject=

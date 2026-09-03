@@ -1,3 +1,9 @@
+torwatchdog (0.9) UNRELEASED; urgency=medium
+
+  * Moved to systemd.
+
+ -- eviljoel <eviljoel@linux.com>  Wed, 22 Jul 2026 21:42:00 -0500
+
 torwatchdog (0.8) stable; urgency=medium
 
   [ Emily Frost ]
