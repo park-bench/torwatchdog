@@ -231,7 +231,8 @@ def check_availability_and_send_notification(config, prior_availability):
     prior_availability.append(get_url_availability(config['url']))
 
     # Send an e-mail if the site is consistently down.
-    if (not any(islice(prior_availability, 1)) and prior_availability[0]):
+    if (not any(islice(prior_availability, 1, len(prior_availability) + 1))
+        and prior_availability[0]):
         message = f"Down notification for {config['url']} at {datetime.datetime.now()}."
         email_error_message = 'Could not send down notification.'
         log_and_send_message(config, message, email_error_message)
@@ -265,8 +266,8 @@ def main_loop(config):
             logger.trace(f'Sleeping for {sleep_seconds} seconds.')
             time.sleep(sleep_seconds)
 
-            prior_availability = check_availability_and_send_notification(
-                config, prior_availability)
+            check_availability_and_send_notification(config, prior_availability)
+
             sdnotify.SystemdNotifier().notify('WATCHDOG=1')
         except Exception as exception:
             logger.error(f'Unexpected exception {type(exception).__name__}: {exception}.\n'
